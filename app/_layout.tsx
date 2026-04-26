@@ -11,26 +11,40 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import {
+  ThemeModeProvider,
+  useThemeMode,
+} from "@/components/theme-mode-provider";
 
 const queryClient = new QueryClient();
+
+function NavigationShell() {
+  const colorScheme = useColorScheme();
+  const { themeMode } = useThemeMode();
+  const isDark = themeMode === "dark" || colorScheme === "dark";
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+        <Stack>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="home" options={{ headerShown: false }} />
+          <Stack.Screen name="movie/[id]" options={{ headerShown: false }} />
+        </Stack>
+        <StatusBar style={isDark ? "light" : "dark"} />
+      </ThemeProvider>
+    </QueryClientProvider>
+  );
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   return (
     <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider
-          value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
-        >
-          <Stack>
-            <Stack.Screen name="index" options={{ headerShown: false }} />
-            <Stack.Screen name="home" options={{ headerShown: false }} />
-            <Stack.Screen name="movie/[id]" options={{ headerShown: false }} />
-          </Stack>
-          <StatusBar style="auto" />
-        </ThemeProvider>
-      </QueryClientProvider>
+      <ThemeModeProvider>
+        <NavigationShell />
+      </ThemeModeProvider>
     </SafeAreaProvider>
   );
 }

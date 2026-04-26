@@ -4,7 +4,7 @@ const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 const TMDB_BACKDROP_BASE_URL = "https://image.tmdb.org/t/p/w1280";
 const TMDB_POSTER_BASE_URL = "https://image.tmdb.org/t/p/w780";
 
-type TmdbUpcomingResponse = {
+type TmdbListResponse = {
   page: number;
   total_pages: number;
   total_results: number;
@@ -95,12 +95,46 @@ export type TrailerItem = {
   rating: number;
   published: string;
   genres: string[];
+  releaseDate: string;
 };
 
-type TrailerPageResponse = {
+export type TrailerCollectionKey =
+  | "popular"
+  | "topRated"
+  | "family"
+  | "action"
+  | "animation"
+  | "horror"
+  | "sciFi"
+  | "comedy"
+  | "drama"
+  | "thriller"
+  | "fantasy";
+
+export type TrailerCollectionDefinition = {
+  key: TrailerCollectionKey;
+  title: string;
+};
+
+export const TRAILER_COLLECTIONS: TrailerCollectionDefinition[] = [
+  { key: "popular", title: "Популярное" },
+  { key: "topRated", title: "Топ рейтинг" },
+  { key: "action", title: "Боевики" },
+  { key: "family", title: "Семейные" },
+  { key: "animation", title: "Анимация" },
+  { key: "sciFi", title: "Фантастика" },
+  { key: "horror", title: "Ужасы" },
+  { key: "thriller", title: "Триллеры" },
+  { key: "comedy", title: "Комедии" },
+  { key: "drama", title: "Драмы" },
+  { key: "fantasy", title: "Фэнтези" },
+];
+
+export type TrailerCollectionResponse = {
+  collection: TrailerCollectionKey;
+  title: string;
   page: number;
   totalPages: number;
-  totalResults: number;
   results: TrailerItem[];
 };
 
@@ -130,6 +164,81 @@ export type MovieDetails = {
     character: string;
     photo: string | null;
   }>;
+};
+
+const formatToday = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = `${today.getMonth() + 1}`.padStart(2, "0");
+  const day = `${today.getDate()}`.padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const createDiscoverConfig = (
+  title: string,
+  extraParams: Record<string, string | number | boolean>,
+) => ({
+  title,
+  path: "/discover/movie",
+  extraParams: {
+    include_adult: false,
+    ...extraParams,
+  },
+});
+
+const COLLECTION_CONFIG: Record<
+  TrailerCollectionKey,
+  {
+    title: string;
+    path: string;
+    extraParams?: Record<string, string | number | boolean>;
+  }
+> = {
+  popular: {
+    title: "Популярное",
+    path: "/movie/popular",
+  },
+  topRated: {
+    title: "Топ рейтинг",
+    path: "/movie/top_rated",
+  },
+  action: createDiscoverConfig("Боевики", {
+    with_genres: 28,
+    sort_by: "popularity.desc",
+  }),
+  family: createDiscoverConfig("Семейные", {
+    with_genres: 10751,
+    sort_by: "popularity.desc",
+  }),
+  animation: createDiscoverConfig("Анимация", {
+    with_genres: 16,
+    sort_by: "popularity.desc",
+  }),
+  horror: createDiscoverConfig("Ужасы", {
+    with_genres: 27,
+    sort_by: "popularity.desc",
+  }),
+  sciFi: createDiscoverConfig("Фантастика", {
+    with_genres: 878,
+    sort_by: "popularity.desc",
+  }),
+  comedy: createDiscoverConfig("Комедии", {
+    with_genres: 35,
+    sort_by: "popularity.desc",
+  }),
+  drama: createDiscoverConfig("Драмы", {
+    with_genres: 18,
+    sort_by: "popularity.desc",
+  }),
+  thriller: createDiscoverConfig("Триллеры", {
+    with_genres: 53,
+    sort_by: "popularity.desc",
+  }),
+  fantasy: createDiscoverConfig("Фэнтези", {
+    with_genres: 14,
+    sort_by: "popularity.desc",
+  }),
 };
 
 const getApiKey = () => {
@@ -165,18 +274,84 @@ const formatBackdrop = (path: string | null) =>
 const formatPoster = (path: string | null) =>
   path ? `${TMDB_POSTER_BASE_URL}${path}` : null;
 
-export const fetchTmdbTrailersPage = async (
-  page: number,
-  limit = 10,
-): Promise<TrailerPageResponse> => {
-  const apiKey = getApiKey();
+const fetchMovieVideos = async (movieId: number, apiKey: string) => {
+  const localized = await axios.get<TmdbVideosResponse>(
+    `${TMDB_BASE_URL}/movie/${movieId}/videos`,
+    {
+      params: {
+        api_key: apiKey,
+        language: "ru-RU",
+      },
+    },
+  );
 
-  const [moviesResponse, genresResponse] = await Promise.all([
-    axios.get<TmdbUpcomingResponse>(`${TMDB_BASE_URL}/movie/upcoming`, {
+  if (localized.data.results.length > 0) {
+    return localized.data.results;
+  }
+
+  const fallback = await axios.get<TmdbVideosResponse>(
+    `${TMDB_BASE_URL}/movie/${movieId}/videos`,
+    {
+      params: {
+        api_key: apiKey,
+      },
+    },
+  );
+
+  return fallback.data.results;
+};
+
+const mapMoviesToTrailers = async (
+  movies: TmdbMovie[],
+  genreMap: Map<number, string>,
+  apiKey: string,
+) => {
+  const trailers = await Promise.all(
+    movies.map(async (movie) => {
+      const videos = await fetchMovieVideos(movie.id, apiKey);
+      const trailerVideo = pickTrailerVideo(videos);
+
+      if (!trailerVideo) {
+        return null;
+      }
+
+      const imagePath =
+        formatBackdrop(movie.backdrop_path) ?? formatPoster(movie.poster_path);
+
+      return {
+        id: movie.id.toString(),
+        title: movie.title,
+        thumbnail:
+          imagePath ?? `https://i.ytimg.com/vi/${trailerVideo.key}/hqdefault.jpg`,
+        yt_id: trailerVideo.key,
+        rating: movie.vote_average,
+        published: trailerVideo.published_at || movie.release_date,
+        genres: movie.genre_ids
+          .map((genreId) => genreMap.get(genreId))
+          .filter((genreName): genreName is string => Boolean(genreName)),
+        releaseDate: movie.release_date,
+      };
+    }),
+  );
+
+  return trailers.filter((trailer): trailer is TrailerItem => Boolean(trailer));
+};
+
+export const fetchTmdbTrailersCollection = async (
+  collection: TrailerCollectionKey,
+  page: number,
+  minResults = 12,
+): Promise<TrailerCollectionResponse> => {
+  const apiKey = getApiKey();
+  const config = COLLECTION_CONFIG[collection];
+
+  const [firstResponse, genresResponse] = await Promise.all([
+    axios.get<TmdbListResponse>(`${TMDB_BASE_URL}${config.path}`, {
       params: {
         api_key: apiKey,
         language: "ru-RU",
         page,
+        ...config.extraParams,
       },
     }),
     axios.get<TmdbGenresResponse>(`${TMDB_BASE_URL}/genre/movie/list`, {
@@ -191,57 +366,47 @@ export const fetchTmdbTrailersPage = async (
     genresResponse.data.genres.map((genre) => [genre.id, genre.name]),
   );
 
-  const candidateMovies = moviesResponse.data.results.slice(
-    0,
-    Math.max(limit * 2, 12),
-  );
+  const rawMovies = [...firstResponse.data.results];
+  let currentPage = page + 1;
 
-  const trailers = await Promise.all(
-    candidateMovies.map(async (movie) => {
-      const { data: videosResponse } = await axios.get<TmdbVideosResponse>(
-        `${TMDB_BASE_URL}/movie/${movie.id}/videos`,
-        {
-          params: {
-            api_key: apiKey,
-            language: "ru-RU",
-          },
+  while (
+    rawMovies.length < minResults * 2 &&
+    currentPage <= firstResponse.data.total_pages
+  ) {
+    const response = await axios.get<TmdbListResponse>(
+      `${TMDB_BASE_URL}${config.path}`,
+      {
+        params: {
+          api_key: apiKey,
+          language: "ru-RU",
+          page: currentPage,
+          ...config.extraParams,
         },
-      );
+      },
+    );
 
-      const trailerVideo = pickTrailerVideo(videosResponse.results);
+    rawMovies.push(...response.data.results);
+    currentPage += 1;
+  }
 
-      if (!trailerVideo) {
-        return null;
-      }
-
-      const imagePath = formatBackdrop(movie.backdrop_path) ?? formatPoster(movie.poster_path);
-
-      return {
-        id: movie.id.toString(),
-        title: movie.title,
-        thumbnail:
-          imagePath ?? `https://i.ytimg.com/vi/${trailerVideo.key}/hqdefault.jpg`,
-        yt_id: trailerVideo.key,
-        rating: movie.vote_average,
-        published: trailerVideo.published_at || movie.release_date,
-        genres: movie.genre_ids
-          .map((genreId) => genreMap.get(genreId))
-          .filter((genreName): genreName is string => Boolean(genreName)),
-      };
-    }),
+  const uniqueMovies = Array.from(
+    new Map(rawMovies.map((movie) => [movie.id, movie])).values(),
   );
+
+  const trailers = await mapMoviesToTrailers(uniqueMovies, genreMap, apiKey);
 
   return {
-    page: moviesResponse.data.page,
-    totalPages: moviesResponse.data.total_pages,
-    totalResults: moviesResponse.data.total_results,
-    results: trailers
-      .filter((trailer): trailer is TrailerItem => Boolean(trailer))
-      .slice(0, limit),
+    collection,
+    title: config.title,
+    page,
+    totalPages: firstResponse.data.total_pages,
+    results: trailers.slice(0, Math.max(minResults, 10)),
   };
 };
 
-export const fetchMovieDetails = async (movieId: string): Promise<MovieDetails> => {
+export const fetchMovieDetails = async (
+  movieId: string,
+): Promise<MovieDetails> => {
   const apiKey = getApiKey();
 
   const { data } = await axios.get<TmdbMovieDetailsResponse>(
