@@ -1,7 +1,8 @@
 import axios from "axios";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
-const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w780";
+const TMDB_BACKDROP_BASE_URL = "https://image.tmdb.org/t/p/w1280";
+const TMDB_POSTER_BASE_URL = "https://image.tmdb.org/t/p/w780";
 
 type TmdbUpcomingResponse = {
   page: number;
@@ -40,6 +41,52 @@ type TmdbVideo = {
   published_at: string;
 };
 
+type TmdbMovieDetailsResponse = {
+  id: number;
+  title: string;
+  original_title: string;
+  overview: string;
+  tagline: string | null;
+  release_date: string;
+  runtime: number | null;
+  vote_average: number;
+  vote_count: number;
+  status: string;
+  backdrop_path: string | null;
+  poster_path: string | null;
+  genres: Array<{
+    id: number;
+    name: string;
+  }>;
+  production_countries: Array<{
+    iso_3166_1: string;
+    name: string;
+  }>;
+  spoken_languages: Array<{
+    english_name: string;
+    name: string;
+  }>;
+  production_companies: Array<{
+    id: number;
+    name: string;
+  }>;
+  credits: {
+    cast: Array<{
+      id: number;
+      name: string;
+      character: string;
+      profile_path: string | null;
+    }>;
+    crew: Array<{
+      id: number;
+      name: string;
+      job: string;
+      department: string;
+    }>;
+  };
+  videos: TmdbVideosResponse;
+};
+
 export type TrailerItem = {
   id: string;
   title: string;
@@ -55,6 +102,34 @@ type TrailerPageResponse = {
   totalPages: number;
   totalResults: number;
   results: TrailerItem[];
+};
+
+export type MovieDetails = {
+  id: string;
+  title: string;
+  originalTitle: string;
+  overview: string;
+  tagline: string | null;
+  releaseDate: string;
+  runtime: number | null;
+  rating: number;
+  voteCount: number;
+  status: string;
+  backdrop: string | null;
+  poster: string | null;
+  genres: string[];
+  trailerKey: string | null;
+  countries: string[];
+  languages: string[];
+  companies: string[];
+  director: string | null;
+  writers: string[];
+  cast: Array<{
+    id: string;
+    name: string;
+    character: string;
+    photo: string | null;
+  }>;
 };
 
 const getApiKey = () => {
@@ -83,6 +158,12 @@ const pickTrailerVideo = (videos: TmdbVideo[]) => {
     videos.find((video) => video.site === "YouTube" && video.type === "Teaser")
   );
 };
+
+const formatBackdrop = (path: string | null) =>
+  path ? `${TMDB_BACKDROP_BASE_URL}${path}` : null;
+
+const formatPoster = (path: string | null) =>
+  path ? `${TMDB_POSTER_BASE_URL}${path}` : null;
 
 export const fetchTmdbTrailersPage = async (
   page: number,
@@ -133,14 +214,13 @@ export const fetchTmdbTrailersPage = async (
         return null;
       }
 
-      const imagePath = movie.backdrop_path ?? movie.poster_path;
+      const imagePath = formatBackdrop(movie.backdrop_path) ?? formatPoster(movie.poster_path);
 
       return {
         id: movie.id.toString(),
         title: movie.title,
-        thumbnail: imagePath
-          ? `${TMDB_IMAGE_BASE_URL}${imagePath}`
-          : `https://i.ytimg.com/vi/${trailerVideo.key}/hqdefault.jpg`,
+        thumbnail:
+          imagePath ?? `https://i.ytimg.com/vi/${trailerVideo.key}/hqdefault.jpg`,
         yt_id: trailerVideo.key,
         rating: movie.vote_average,
         published: trailerVideo.published_at || movie.release_date,
@@ -158,5 +238,67 @@ export const fetchTmdbTrailersPage = async (
     results: trailers
       .filter((trailer): trailer is TrailerItem => Boolean(trailer))
       .slice(0, limit),
+  };
+};
+
+export const fetchMovieDetails = async (movieId: string): Promise<MovieDetails> => {
+  const apiKey = getApiKey();
+
+  const { data } = await axios.get<TmdbMovieDetailsResponse>(
+    `${TMDB_BASE_URL}/movie/${movieId}`,
+    {
+      params: {
+        api_key: apiKey,
+        language: "ru-RU",
+        append_to_response: "credits,videos",
+      },
+    },
+  );
+
+  const trailerVideo = pickTrailerVideo(data.videos.results);
+  const director =
+    data.credits.crew.find((member) => member.job === "Director")?.name ?? null;
+
+  const writers = Array.from(
+    new Set(
+      data.credits.crew
+        .filter(
+          (member) =>
+            member.job === "Writer" ||
+            member.job === "Screenplay" ||
+            member.job === "Story",
+        )
+        .map((member) => member.name),
+    ),
+  );
+
+  return {
+    id: data.id.toString(),
+    title: data.title,
+    originalTitle: data.original_title,
+    overview: data.overview,
+    tagline: data.tagline,
+    releaseDate: data.release_date,
+    runtime: data.runtime,
+    rating: data.vote_average,
+    voteCount: data.vote_count,
+    status: data.status,
+    backdrop: formatBackdrop(data.backdrop_path),
+    poster: formatPoster(data.poster_path),
+    genres: data.genres.map((genre) => genre.name),
+    trailerKey: trailerVideo?.key ?? null,
+    countries: data.production_countries.map((country) => country.name),
+    languages: data.spoken_languages.map(
+      (language) => language.name || language.english_name,
+    ),
+    companies: data.production_companies.map((company) => company.name),
+    director,
+    writers,
+    cast: data.credits.cast.slice(0, 10).map((member) => ({
+      id: member.id.toString(),
+      name: member.name,
+      character: member.character,
+      photo: formatPoster(member.profile_path),
+    })),
   };
 };
