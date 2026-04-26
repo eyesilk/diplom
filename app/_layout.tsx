@@ -8,9 +8,8 @@ import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-
-import { useColorScheme } from "@/hooks/use-color-scheme";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+
 import {
   ThemeModeProvider,
   useThemeMode,
@@ -19,9 +18,8 @@ import {
 const queryClient = new QueryClient();
 
 function NavigationShell() {
-  const colorScheme = useColorScheme();
   const { themeMode } = useThemeMode();
-  const isDark = themeMode === "dark" || colorScheme === "dark";
+  const isDark = themeMode === "dark";
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -38,8 +36,6 @@ function NavigationShell() {
 }
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <SafeAreaProvider>
       <ThemeModeProvider>

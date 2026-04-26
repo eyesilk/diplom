@@ -1,8 +1,8 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   ImageBackground,
   StyleSheet,
-  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -11,13 +11,24 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 
+import ThemeToggle from "@/components/theme-toggle";
 import { useThemeMode } from "@/components/theme-mode-provider";
+import { fetchTmdbTrailersCollection } from "@/constants/tmdb";
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "long",
+  });
+}
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const { width, height } = useWindowDimensions();
-  const { themeMode, setThemeMode } = useThemeMode();
+  const { width } = useWindowDimensions();
+  const { themeMode } = useThemeMode();
+  const [activeSlide, setActiveSlide] = useState(0);
 
   const isLight = themeMode === "light";
   const isTablet = width >= 768;
@@ -25,6 +36,32 @@ export default function WelcomeScreen() {
 
   const heroTitleSize = isLargeScreen ? 76 : isTablet ? 60 : 46;
   const subtitleSize = isLargeScreen ? 22 : isTablet ? 18 : 16;
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["welcome-slider", "popular"],
+    queryFn: () => fetchTmdbTrailersCollection("popular", 1, 5),
+  });
+
+  const slides = useMemo(() => data?.results.slice(0, 5) ?? [], [data]);
+  const currentSlide = slides[activeSlide] ?? null;
+
+  useEffect(() => {
+    if (slides.length <= 1) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setActiveSlide((current) => (current + 1) % slides.length);
+    }, 3800);
+
+    return () => clearInterval(interval);
+  }, [slides.length]);
+
+  useEffect(() => {
+    if (activeSlide >= slides.length) {
+      setActiveSlide(0);
+    }
+  }, [activeSlide, slides.length]);
 
   return (
     <View
@@ -50,7 +87,10 @@ export default function WelcomeScreen() {
         </ImageBackground>
       )}
 
-      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right", "bottom"]}>
+      <SafeAreaView
+        style={styles.safeArea}
+        edges={["top", "left", "right", "bottom"]}
+      >
         <View style={styles.topBar}>
           <View style={[styles.brandPill, isLight && styles.brandPillLight]}>
             <Ionicons
@@ -63,27 +103,7 @@ export default function WelcomeScreen() {
             </Text>
           </View>
 
-          <View style={[styles.themeToggle, isLight && styles.themeToggleLight]}>
-            <Ionicons
-              name="moon-outline"
-              size={16}
-              color={isLight ? "#8aa0b5" : "#f4f7fb"}
-            />
-            <Switch
-              value={isLight}
-              onValueChange={(value) =>
-                setThemeMode(value ? "light" : "dark")
-              }
-              trackColor={{ false: "#24384d", true: "#cfd9e4" }}
-              thumbColor={isLight ? "#ffffff" : "#f5c451"}
-              ios_backgroundColor={isLight ? "#cfd9e4" : "#24384d"}
-            />
-            <Ionicons
-              name="sunny-outline"
-              size={16}
-              color={isLight ? "#d79d2f" : "#8ea7bd"}
-            />
-          </View>
+          <ThemeToggle />
         </View>
 
         <View style={styles.hero}>
@@ -91,7 +111,11 @@ export default function WelcomeScreen() {
             <Text
               style={[
                 styles.title,
-                { fontSize: heroTitleSize, color: isLight ? "#0c1723" : "#f6f8fb" },
+                {
+                  fontSize: heroTitleSize,
+                  lineHeight: heroTitleSize * 1.06,
+                  color: isLight ? "#0c1723" : "#f6f8fb",
+                },
               ]}
             >
               Выбирай кино по настроению
@@ -112,97 +136,112 @@ export default function WelcomeScreen() {
 
           <View
             style={[
-              styles.showcase,
-              isLight ? styles.showcaseLight : styles.showcaseDark,
+              styles.sliderCard,
+              isLight ? styles.sliderCardLight : styles.sliderCardDark,
             ]}
           >
-            <View style={styles.showcaseHeader}>
-              <Text
-                style={[
-                  styles.showcaseEyebrow,
-                  isLight && styles.showcaseEyebrowLight,
-                ]}
+            {currentSlide ? (
+              <ImageBackground
+                source={{ uri: currentSlide.thumbnail }}
+                style={styles.sliderImage}
+                imageStyle={styles.sliderImageStyle}
               >
-                Сегодня в фокусе
-              </Text>
-              <View
-                style={[
-                  styles.livePill,
-                  isLight ? styles.livePillLight : styles.livePillDark,
-                ]}
-              >
-                <View
-                  style={[
-                    styles.liveDot,
-                    { backgroundColor: isLight ? "#ff7a59" : "#f5c451" },
-                  ]}
-                />
-                <Text
-                  style={[
-                    styles.liveText,
-                    isLight && styles.liveTextLight,
-                  ]}
-                >
-                  Movie Feed
-                </Text>
-              </View>
-            </View>
+                <View style={styles.sliderOverlay} />
+                <View style={styles.sliderContent}>
+                  <View style={styles.sliderTopRow}>
+                    <View
+                      style={[
+                        styles.sliderPill,
+                        isLight ? styles.sliderPillLight : styles.sliderPillDark,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.sliderPillText,
+                          isLight && styles.sliderPillTextLight,
+                        ]}
+                      >
+                        Сейчас смотрят
+                      </Text>
+                    </View>
 
-            <View style={styles.showcaseRow}>
-              <View
-                style={[
-                  styles.posterMock,
-                  isLight ? styles.posterMockLight : styles.posterMockDark,
-                ]}
-              >
-                <Ionicons
-                  name="play-circle"
-                  size={34}
-                  color={isLight ? "#0d1722" : "#f5c451"}
-                />
-              </View>
+                    <View style={styles.sliderDots}>
+                      {slides.map((slide, index) => (
+                        <View
+                          key={slide.id}
+                          style={[
+                            styles.sliderDot,
+                            index === activeSlide && styles.sliderDotActive,
+                          ]}
+                        />
+                      ))}
+                    </View>
+                  </View>
 
-              <View style={styles.showcaseTextBlock}>
-                <Text
-                  style={[
-                    styles.showcaseTitle,
-                    { color: isLight ? "#0d1722" : "#f4f7fb" },
-                  ]}
-                >
-                  Популярное. Фантастика. Боевики.
-                </Text>
-                <Text
-                  style={[
-                    styles.showcaseSubtitle,
-                    { color: isLight ? "#61778b" : "#9fb2c4" },
-                  ]}
-                >
-                  Открывай карточку фильма, смотри трейлер и переходи к полной
-                  информации без лишних шагов.
-                </Text>
-              </View>
-            </View>
+                  <Text style={styles.sliderTitle}>{currentSlide.title}</Text>
 
-            <View style={styles.featureRow}>
-              {["Популярное", "Фантастика", "Комедии"].map((item) => (
-                <View
-                  key={item}
-                  style={[
-                    styles.featureChip,
-                    isLight ? styles.featureChipLight : styles.featureChipDark,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.featureChipText,
-                      isLight && styles.featureChipTextLight,
-                    ]}
-                  >
-                    {item}
-                  </Text>
+                  <View style={styles.sliderMetaRow}>
+                    <View style={styles.sliderMetaPill}>
+                      <Ionicons name="star" size={14} color="#f5c451" />
+                      <Text style={styles.sliderMetaText}>
+                        {currentSlide.rating.toFixed(1)}
+                      </Text>
+                    </View>
+
+                    <View style={styles.sliderMetaPill}>
+                      <Ionicons
+                        name="calendar-outline"
+                        size={14}
+                        color="#d6e2ee"
+                      />
+                      <Text style={styles.sliderMetaText}>
+                        {formatDate(currentSlide.releaseDate)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.sliderGenreRow}>
+                    {currentSlide.genres.slice(0, 3).map((genre) => (
+                      <View key={genre} style={styles.sliderGenreChip}>
+                        <Text style={styles.sliderGenreText}>{genre}</Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
-              ))}
-            </View>
+              </ImageBackground>
+            ) : (
+              <View style={styles.sliderFallback}>
+                {isLoading ? (
+                  <>
+                    <ActivityIndicator size="large" color="#f5c451" />
+                    <Text
+                      style={[
+                        styles.sliderFallbackText,
+                        { color: isLight ? "#61778b" : "#9fb2c4" },
+                      ]}
+                    >
+                      Собираем актуальные трейлеры
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons
+                      name="film-outline"
+                      size={34}
+                      color={isLight ? "#0d1722" : "#f5c451"}
+                    />
+                    <Text
+                      style={[
+                        styles.sliderFallbackText,
+                        { color: isLight ? "#61778b" : "#9fb2c4" },
+                      ]}
+                    >
+                      Популярные фильмы и свежие трейлеры
+                    </Text>
+                  </>
+                )}
+              </View>
+            )}
           </View>
         </View>
 
@@ -227,63 +266,51 @@ export default function WelcomeScreen() {
             />
           </TouchableOpacity>
 
-          <View style={styles.statsRow}>
-            <View style={[styles.statItem, isLight && styles.statItemLight]}>
-              <Text
-                style={[
-                  styles.statValue,
-                  { color: isLight ? "#0d1722" : "#f4f7fb" },
-                ]}
+          <View style={styles.featureGrid}>
+            {[
+              {
+                title: "Подборки",
+                subtitle: "Популярное и жанры",
+                icon: "albums-outline",
+              },
+              {
+                title: "Карточки",
+                subtitle: "Рейтинг, актеры, описание",
+                icon: "document-text-outline",
+              },
+              {
+                title: "Трейлеры",
+                subtitle: "Быстрый переход к фильму",
+                icon: "play-circle-outline",
+              },
+            ].map((item) => (
+              <View
+                key={item.title}
+                style={[styles.featureCard, isLight && styles.featureCardLight]}
               >
-                12
-              </Text>
-              <Text
-                style={[
-                  styles.statLabel,
-                  { color: isLight ? "#61778b" : "#8ea7bd" },
-                ]}
-              >
-                подборок
-              </Text>
-            </View>
-
-            <View style={[styles.statItem, isLight && styles.statItemLight]}>
-              <Text
-                style={[
-                  styles.statValue,
-                  { color: isLight ? "#0d1722" : "#f4f7fb" },
-                ]}
-              >
-                TMDB
-              </Text>
-              <Text
-                style={[
-                  styles.statLabel,
-                  { color: isLight ? "#61778b" : "#8ea7bd" },
-                ]}
-              >
-                база фильмов
-              </Text>
-            </View>
-
-            <View style={[styles.statItem, isLight && styles.statItemLight]}>
-              <Text
-                style={[
-                  styles.statValue,
-                  { color: isLight ? "#0d1722" : "#f4f7fb" },
-                ]}
-              >
-                HD
-              </Text>
-              <Text
-                style={[
-                  styles.statLabel,
-                  { color: isLight ? "#61778b" : "#8ea7bd" },
-                ]}
-              >
-                постеры
-              </Text>
-            </View>
+                <Ionicons
+                  name={item.icon as keyof typeof Ionicons.glyphMap}
+                  size={18}
+                  color={isLight ? "#0d1722" : "#f5c451"}
+                />
+                <Text
+                  style={[
+                    styles.featureTitle,
+                    { color: isLight ? "#0d1722" : "#f4f7fb" },
+                  ]}
+                >
+                  {item.title}
+                </Text>
+                <Text
+                  style={[
+                    styles.featureSubtitle,
+                    { color: isLight ? "#61778b" : "#8ea7bd" },
+                  ]}
+                >
+                  {item.subtitle}
+                </Text>
+              </View>
+            ))}
           </View>
         </View>
       </SafeAreaView>
@@ -373,20 +400,6 @@ const styles = StyleSheet.create({
   brandTextLight: {
     color: "#0d1722",
   },
-  themeToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: "rgba(9, 18, 28, 0.78)",
-  },
-  themeToggleLight: {
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#dde6ee",
-  },
   hero: {
     flex: 1,
     justifyContent: "center",
@@ -398,7 +411,6 @@ const styles = StyleSheet.create({
   },
   title: {
     fontWeight: "800",
-    lineHeight: 52,
     maxWidth: 520,
   },
   subtitle: {
@@ -406,121 +418,128 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     maxWidth: 460,
   },
-  showcase: {
+  sliderCard: {
+    minHeight: 260,
     borderRadius: 8,
-    paddingHorizontal: 18,
-    paddingVertical: 18,
+    overflow: "hidden",
   },
-  showcaseDark: {
+  sliderCardDark: {
     backgroundColor: "rgba(10, 19, 30, 0.82)",
     borderWidth: 1,
     borderColor: "rgba(167, 199, 231, 0.14)",
   },
-  showcaseLight: {
+  sliderCardLight: {
     backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: "#dde6ee",
   },
-  showcaseHeader: {
+  sliderImage: {
+    minHeight: 260,
+    justifyContent: "flex-end",
+  },
+  sliderImageStyle: {
+    borderRadius: 8,
+  },
+  sliderOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(8, 16, 25, 0.42)",
+  },
+  sliderContent: {
+    padding: 18,
+  },
+  sliderTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 18,
+    marginBottom: 16,
   },
-  showcaseEyebrow: {
-    color: "#f5c451",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  showcaseEyebrowLight: {
-    color: "#d79d2f",
-  },
-  livePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
+  sliderPill: {
     borderRadius: 999,
-    paddingHorizontal: 10,
+    paddingHorizontal: 11,
     paddingVertical: 7,
   },
-  livePillDark: {
-    backgroundColor: "#132131",
+  sliderPillDark: {
+    backgroundColor: "rgba(9, 18, 28, 0.72)",
   },
-  livePillLight: {
-    backgroundColor: "#f4f6f8",
+  sliderPillLight: {
+    backgroundColor: "rgba(255,255,255,0.82)",
   },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  liveText: {
-    color: "#dce8f3",
+  sliderPillText: {
+    color: "#f4f7fb",
     fontSize: 12,
-    fontWeight: "700",
-  },
-  liveTextLight: {
-    color: "#54697d",
-  },
-  showcaseRow: {
-    flexDirection: "row",
-    gap: 16,
-    alignItems: "center",
-  },
-  posterMock: {
-    width: 88,
-    aspectRatio: 2 / 3,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  posterMockDark: {
-    backgroundColor: "#132131",
-    borderWidth: 1,
-    borderColor: "rgba(167, 199, 231, 0.12)",
-  },
-  posterMockLight: {
-    backgroundColor: "#eef3f7",
-    borderWidth: 1,
-    borderColor: "#dbe4ec",
-  },
-  showcaseTextBlock: {
-    flex: 1,
-  },
-  showcaseTitle: {
-    fontSize: 20,
     fontWeight: "800",
-    lineHeight: 26,
   },
-  showcaseSubtitle: {
-    marginTop: 8,
-    fontSize: 14,
-    lineHeight: 21,
+  sliderPillTextLight: {
+    color: "#0d1722",
   },
-  featureRow: {
+  sliderDots: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  sliderDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "rgba(255,255,255,0.35)",
+  },
+  sliderDotActive: {
+    backgroundColor: "#f5c451",
+    width: 18,
+  },
+  sliderTitle: {
+    color: "#f4f7fb",
+    fontSize: 28,
+    fontWeight: "800",
+    lineHeight: 34,
+    maxWidth: "88%",
+  },
+  sliderMetaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginTop: 18,
+    gap: 10,
+    marginTop: 16,
   },
-  featureChip: {
+  sliderMetaPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(9, 18, 28, 0.72)",
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  featureChipDark: {
-    backgroundColor: "#132131",
-  },
-  featureChipLight: {
-    backgroundColor: "#eef3f7",
-  },
-  featureChipText: {
-    color: "#d9e6f2",
+  sliderMetaText: {
+    color: "#f4f7fb",
     fontSize: 13,
     fontWeight: "700",
   },
-  featureChipTextLight: {
-    color: "#43586c",
+  sliderGenreRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 14,
+  },
+  sliderGenreChip: {
+    backgroundColor: "rgba(19, 33, 49, 0.92)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  sliderGenreText: {
+    color: "#e3edf6",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  sliderFallback: {
+    minHeight: 260,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 24,
+  },
+  sliderFallbackText: {
+    fontSize: 15,
+    textAlign: "center",
   },
   bottomArea: {
     paddingBottom: 8,
@@ -543,32 +562,34 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "800",
   },
-  statsRow: {
+  featureGrid: {
     flexDirection: "row",
     gap: 10,
     marginTop: 14,
   },
-  statItem: {
+  featureCard: {
     flex: 1,
-    minHeight: 76,
+    minHeight: 108,
     borderRadius: 8,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 14,
     backgroundColor: "rgba(9, 18, 28, 0.78)",
     borderWidth: 1,
     borderColor: "rgba(167, 199, 231, 0.12)",
     justifyContent: "space-between",
   },
-  statItemLight: {
+  featureCardLight: {
     backgroundColor: "#ffffff",
     borderColor: "#dde6ee",
   },
-  statValue: {
-    fontSize: 18,
+  featureTitle: {
+    fontSize: 15,
     fontWeight: "800",
+    marginTop: 8,
   },
-  statLabel: {
+  featureSubtitle: {
     fontSize: 12,
-    lineHeight: 16,
+    lineHeight: 17,
+    marginTop: 6,
   },
 });

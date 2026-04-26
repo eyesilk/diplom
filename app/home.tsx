@@ -15,6 +15,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { type Href, useRouter } from "expo-router";
 
 import Trailer from "@/components/trailer";
+import ThemeToggle from "@/components/theme-toggle";
+import { useThemeMode } from "@/components/theme-mode-provider";
 import {
   fetchTmdbTrailersCollection,
   TRAILER_COLLECTIONS,
@@ -35,7 +37,7 @@ function pickHighlightLabel(rating: number) {
   }
 
   if (rating >= 6.5) {
-    return "Неплохой старт";
+    return "В тренде";
   }
 
   return "Свежий трейлер";
@@ -44,6 +46,39 @@ function pickHighlightLabel(rating: number) {
 export default function Home() {
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
+  const { themeMode } = useThemeMode();
+  const isLight = themeMode === "light";
+
+  const palette = isLight
+    ? {
+        background: "#f4f6f8",
+        card: "#ffffff",
+        cardAlt: "#eef3f7",
+        border: "#dde6ee",
+        text: "#0d1722",
+        muted: "#61778b",
+        accent: "#112639",
+        accentText: "#ffffff",
+        tabBg: "#ffffff",
+        tabText: "#3f566b",
+        pillBg: "#eef3f7",
+        pillText: "#3f566b",
+      }
+    : {
+        background: "#08111b",
+        card: "#0f1b28",
+        cardAlt: "#132131",
+        border: "rgba(167, 199, 231, 0.1)",
+        text: "#f4f7fb",
+        muted: "#8ea7bd",
+        accent: "#f5c451",
+        accentText: "#08111b",
+        tabBg: "#0f1b28",
+        tabText: "#d8e5f2",
+        pillBg: "#132131",
+        pillText: "#d8e5f2",
+      };
+
   const [selectedCollection, setSelectedCollection] =
     useState<TrailerCollectionKey>("popular");
   const [page, setPage] = useState<number>(1);
@@ -61,9 +96,9 @@ export default function Home() {
 
   const averageRating = trailers.length
     ? (
-      trailers.reduce((sum, trailer) => sum + trailer.rating, 0) /
-      trailers.length
-    ).toFixed(1)
+        trailers.reduce((sum, trailer) => sum + trailer.rating, 0) /
+        trailers.length
+      ).toFixed(1)
     : "—";
 
   const dominantGenres = useMemo(() => {
@@ -102,35 +137,35 @@ export default function Home() {
   const isLastPage = Boolean(data?.totalPages && page >= data.totalPages);
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: palette.background }]}
+      edges={["top", "left", "right"]}
+    >
       <ScrollView
         ref={scrollRef}
-        style={styles.screen}
+        style={[styles.screen, { backgroundColor: palette.background }]}
         contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl
             refreshing={isFetching && !isLoading}
             onRefresh={() => refetch()}
-            tintColor="#f5c451"
+            tintColor={isLight ? "#112639" : "#f5c451"}
           />
         }
       >
         <View style={styles.topBar}>
           <View>
-            <Text style={styles.eyebrow}>Movie Trailers</Text>
-            <Text style={styles.header}>Трейлеры</Text>
+            <Text style={[styles.eyebrow, { color: isLight ? "#506579" : "#f5c451" }]}>
+              Movie Trailers
+            </Text>
+            <Text style={[styles.header, { color: palette.text }]}>Трейлеры</Text>
           </View>
 
-          <View style={styles.pageBadge}>
-            <Ionicons name="albums-outline" size={16} color="#f5c451" />
-            <Text style={styles.pageBadgeText}>
-              {data?.page ?? page}/{data?.totalPages ?? "—"}
-            </Text>
-          </View>
+          <ThemeToggle />
         </View>
 
-        <Text style={styles.subheader}>
-          Популярные подборки, большие премьеры и быстрый переход к трейлерам.
+        <Text style={[styles.subheader, { color: palette.muted }]}>
+          Популярные подборки, большие релизы и быстрый переход к фильму.
         </Text>
 
         <ScrollView
@@ -147,13 +182,18 @@ export default function Home() {
                 onPress={() => handleCollectionChange(collection.key)}
                 style={[
                   styles.collectionTab,
-                  isActive && styles.collectionTabActive,
+                  {
+                    backgroundColor: isActive ? palette.accent : palette.tabBg,
+                    borderColor: isActive ? palette.accent : palette.border,
+                  },
                 ]}
               >
                 <Text
                   style={[
                     styles.collectionTabTitle,
-                    isActive && styles.collectionTabTitleActive,
+                    {
+                      color: isActive ? palette.accentText : palette.tabText,
+                    },
                   ]}
                 >
                   {collection.title}
@@ -164,16 +204,33 @@ export default function Home() {
         </ScrollView>
 
         {isLoading && (
-          <View style={styles.stateCard}>
-            <ActivityIndicator size="large" color="#f5c451" />
-            <Text style={styles.stateText}>Собираем свежую подборку</Text>
+          <View
+            style={[
+              styles.stateCard,
+              { backgroundColor: palette.card, borderColor: palette.border },
+            ]}
+          >
+            <ActivityIndicator
+              size="large"
+              color={isLight ? "#112639" : "#f5c451"}
+            />
+            <Text style={[styles.stateText, { color: palette.muted }]}>
+              Собираем свежую подборку
+            </Text>
           </View>
         )}
 
         {isError && (
-          <View style={styles.stateCard}>
-            <Text style={styles.errorTitle}>Не удалось загрузить подборку</Text>
-            <Text style={styles.errorText}>
+          <View
+            style={[
+              styles.stateCard,
+              { backgroundColor: palette.card, borderColor: palette.border },
+            ]}
+          >
+            <Text style={[styles.errorTitle, { color: palette.text }]}>
+              Не удалось загрузить подборку
+            </Text>
+            <Text style={[styles.errorText, { color: palette.muted }]}>
               Потяни вниз, чтобы обновить данные.
             </Text>
           </View>
@@ -181,17 +238,23 @@ export default function Home() {
 
         {!isLoading && !isError && data && featuredTrailer && (
           <>
-            <View style={styles.currentCollectionCard}>
-              <Text style={styles.currentCollectionTitle}>{data.title}</Text>
-              <Text style={styles.currentCollectionMeta}>
-                Страница {data.page} из {data.totalPages} • {trailers.length}{" "}
-                трейлеров
+            <View
+              style={[
+                styles.currentCollectionCard,
+                { backgroundColor: palette.card, borderColor: palette.border },
+              ]}
+            >
+              <Text style={[styles.currentCollectionTitle, { color: palette.text }]}>
+                {data.title}
+              </Text>
+              <Text style={[styles.currentCollectionMeta, { color: palette.muted }]}>
+                Страница {data.page} из {data.totalPages} • {trailers.length} трейлеров
               </Text>
             </View>
 
             <TouchableOpacity
               activeOpacity={0.92}
-              style={styles.heroCard}
+              style={[styles.heroCard, { borderColor: palette.border }]}
               onPress={() =>
                 router.push(
                   {
@@ -208,8 +271,18 @@ export default function Home() {
               >
                 <View style={styles.heroOverlay} />
                 <View style={styles.heroContent}>
-                  <View style={styles.heroTag}>
-                    <Text style={styles.heroTagText}>
+                  <View
+                    style={[
+                      styles.heroTag,
+                      { backgroundColor: isLight ? "rgba(255,255,255,0.9)" : "rgba(245, 196, 81, 0.92)" },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.heroTagText,
+                        { color: isLight ? "#0d1722" : "#08111b" },
+                      ]}
+                    >
                       {pickHighlightLabel(featuredTrailer.rating)}
                     </Text>
                   </View>
@@ -228,7 +301,7 @@ export default function Home() {
                       <Ionicons
                         name="calendar-outline"
                         size={14}
-                        color="#c7d7e6"
+                        color="#d6e2ee"
                       />
                       <Text style={styles.heroMetaText}>
                         {formatDate(featuredTrailer.published)}
@@ -243,47 +316,49 @@ export default function Home() {
                       </View>
                     ))}
                   </View>
-
-                  <View style={styles.heroActions}>
-                    <View style={styles.primaryAction}>
-                      <Ionicons name="play" size={16} color="#08111b" />
-                      <Text style={styles.primaryActionText}>Открыть фильм</Text>
-                    </View>
-                  </View>
                 </View>
               </ImageBackground>
             </TouchableOpacity>
 
             <View style={styles.statsRow}>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>{trailers.length}</Text>
-                <Text style={styles.statLabel}>трейлеров в ленте</Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>{averageRating}</Text>
-                <Text style={styles.statLabel}>средний рейтинг</Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>{data.page}</Text>
-                <Text style={styles.statLabel}>текущая страница</Text>
-              </View>
+              {[
+                { value: trailers.length.toString(), label: "в ленте" },
+                { value: averageRating, label: "средний рейтинг" },
+                { value: dominantGenres[0]?.[0] ?? "жанры", label: "в фокусе" },
+              ].map((item) => (
+                <View
+                  key={item.label}
+                  style={[
+                    styles.statCard,
+                    { backgroundColor: palette.card, borderColor: palette.border },
+                  ]}
+                >
+                  <Text style={[styles.statValue, { color: palette.text }]}>
+                    {item.value}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: palette.muted }]}>
+                    {item.label}
+                  </Text>
+                </View>
+              ))}
             </View>
 
             <View style={styles.sectionHeaderRow}>
-              <View>
-                <Text style={styles.sectionTitle}>Жанры в подборке</Text>
-                <Text style={styles.sectionSubtitle}>
-                  То, что чаще всего встречается в текущей ленте
-                </Text>
-              </View>
+              <Text style={[styles.sectionTitle, { color: palette.text }]}>
+                Жанры в подборке
+              </Text>
             </View>
 
             <View style={styles.genreSummaryRow}>
               {dominantGenres.map(([genre, count]) => (
-                <View key={genre} style={styles.genreSummaryChip}>
-                  <Text style={styles.genreSummaryText}>
+                <View
+                  key={genre}
+                  style={[
+                    styles.genreSummaryChip,
+                    { backgroundColor: palette.cardAlt },
+                  ]}
+                >
+                  <Text style={[styles.genreSummaryText, { color: palette.pillText }]}>
                     {genre} • {count}
                   </Text>
                 </View>
@@ -291,10 +366,9 @@ export default function Home() {
             </View>
 
             <View style={styles.sectionHeaderRow}>
-              <View>
-                <Text style={styles.sectionTitle}>Все трейлеры</Text>
-                <Text style={styles.sectionSubtitle}>Лента текущей подборки</Text>
-              </View>
+              <Text style={[styles.sectionTitle, { color: palette.text }]}>
+                Все трейлеры
+              </Text>
             </View>
 
             {listTrailers.map((trailer) => (
@@ -310,10 +384,19 @@ export default function Home() {
               />
             ))}
 
-            <View style={styles.paginationCard}>
+            <View
+              style={[
+                styles.paginationCard,
+                { backgroundColor: palette.card, borderColor: palette.border },
+              ]}
+            >
               <View style={styles.paginationTextWrap}>
-                <Text style={styles.paginationTitle}>Страницы подборки</Text>
-                <Text style={styles.paginationSubtitle}>
+                <Text style={[styles.paginationTitle, { color: palette.text }]}>
+                  Страницы подборки
+                </Text>
+                <Text
+                  style={[styles.paginationSubtitle, { color: palette.muted }]}
+                >
                   {data.title} • страница {data.page} из {data.totalPages}
                 </Text>
               </View>
@@ -324,18 +407,20 @@ export default function Home() {
                   disabled={page === 1}
                   style={[
                     styles.paginationButton,
-                    page === 1 && styles.paginationButtonDisabled,
+                    {
+                      backgroundColor: page === 1 ? palette.cardAlt : palette.cardAlt,
+                    },
                   ]}
                 >
                   <Ionicons
                     name="chevron-back"
                     size={18}
-                    color={page === 1 ? "#5f7388" : "#f4f7fb"}
+                    color={page === 1 ? "#8aa0b5" : palette.text}
                   />
                   <Text
                     style={[
                       styles.paginationButtonText,
-                      page === 1 && styles.paginationButtonTextDisabled,
+                      { color: page === 1 ? "#8aa0b5" : palette.text },
                     ]}
                   >
                     Назад
@@ -347,15 +432,17 @@ export default function Home() {
                   disabled={isLastPage}
                   style={[
                     styles.paginationButton,
-                    styles.paginationButtonAccent,
-                    isLastPage && styles.paginationButtonDisabled,
+                    {
+                      backgroundColor: isLastPage ? palette.cardAlt : palette.accent,
+                    },
                   ]}
                 >
                   <Text
                     style={[
                       styles.paginationButtonText,
-                      styles.paginationButtonTextAccent,
-                      isLastPage && styles.paginationButtonTextDisabled,
+                      {
+                        color: isLastPage ? "#8aa0b5" : palette.accentText,
+                      },
                     ]}
                   >
                     Дальше
@@ -363,7 +450,7 @@ export default function Home() {
                   <Ionicons
                     name="chevron-forward"
                     size={18}
-                    color={isLastPage ? "#5f7388" : "#08111b"}
+                    color={isLastPage ? "#8aa0b5" : palette.accentText}
                   />
                 </TouchableOpacity>
               </View>
@@ -378,11 +465,9 @@ export default function Home() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#08111b",
   },
   screen: {
     flex: 1,
-    backgroundColor: "#08111b",
   },
   content: {
     paddingHorizontal: 20,
@@ -391,44 +476,26 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
     marginTop: 8,
   },
   eyebrow: {
-    color: "#f5c451",
     fontSize: 13,
     fontWeight: "700",
     marginBottom: 6,
   },
   header: {
-    color: "#f4f7fb",
     fontSize: 34,
     fontWeight: "800",
     lineHeight: 40,
     maxWidth: 250,
   },
   subheader: {
-    color: "#90a7bc",
     fontSize: 15,
     lineHeight: 23,
     marginTop: 14,
     marginBottom: 24,
     maxWidth: 340,
-  },
-  pageBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#132131",
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    marginTop: 6,
-  },
-  pageBadgeText: {
-    color: "#d8e5f2",
-    fontSize: 13,
-    fontWeight: "700",
   },
   collectionTabs: {
     gap: 12,
@@ -436,33 +503,20 @@ const styles = StyleSheet.create({
     paddingRight: 20,
   },
   collectionTab: {
-    width: 190,
     minHeight: 64,
-    backgroundColor: "#0f1b28",
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "rgba(167, 199, 231, 0.08)",
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 14,
     justifyContent: "center",
   },
-  collectionTabActive: {
-    backgroundColor: "#f5c451",
-    borderColor: "#f5c451",
-  },
   collectionTabTitle: {
-    color: "#f4f7fb",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "800",
   },
-  collectionTabTitleActive: {
-    color: "#08111b",
-  },
   stateCard: {
-    backgroundColor: "#0f1b28",
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "rgba(167, 199, 231, 0.1)",
     paddingVertical: 28,
     paddingHorizontal: 18,
     alignItems: "center",
@@ -471,45 +525,37 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   stateText: {
-    color: "#d6e2ee",
     fontSize: 15,
   },
   errorTitle: {
-    color: "#f4f7fb",
     fontSize: 20,
     fontWeight: "700",
   },
   errorText: {
-    color: "#90a7bc",
     fontSize: 14,
     lineHeight: 21,
     textAlign: "center",
   },
   currentCollectionCard: {
     marginTop: 22,
-    backgroundColor: "#0f1b28",
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderWidth: 1,
-    borderColor: "rgba(167, 199, 231, 0.1)",
   },
   currentCollectionTitle: {
-    color: "#f4f7fb",
     fontSize: 22,
     fontWeight: "800",
   },
   currentCollectionMeta: {
-    color: "#cbd8e4",
     fontSize: 13,
     lineHeight: 18,
-    marginTop: 12,
+    marginTop: 8,
   },
   heroCard: {
     borderRadius: 8,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(167, 199, 231, 0.14)",
     marginTop: 18,
   },
   heroImage: {
@@ -528,14 +574,12 @@ const styles = StyleSheet.create({
   },
   heroTag: {
     alignSelf: "flex-start",
-    backgroundColor: "rgba(245, 196, 81, 0.92)",
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginBottom: 12,
   },
   heroTagText: {
-    color: "#08111b",
     fontSize: 12,
     fontWeight: "800",
   },
@@ -583,24 +627,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
-  heroActions: {
-    marginTop: 20,
-  },
-  primaryAction: {
-    alignSelf: "flex-start",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#f5c451",
-    borderRadius: 999,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  primaryActionText: {
-    color: "#08111b",
-    fontSize: 14,
-    fontWeight: "800",
-  },
   statsRow: {
     flexDirection: "row",
     gap: 10,
@@ -609,21 +635,17 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     minHeight: 88,
-    backgroundColor: "#0f1b28",
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "rgba(167, 199, 231, 0.1)",
     paddingHorizontal: 14,
     paddingVertical: 14,
     justifyContent: "space-between",
   },
   statValue: {
-    color: "#f4f7fb",
     fontSize: 21,
     fontWeight: "800",
   },
   statLabel: {
-    color: "#90a7bc",
     fontSize: 12,
     lineHeight: 16,
   },
@@ -632,15 +654,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   sectionTitle: {
-    color: "#f4f7fb",
     fontSize: 23,
     fontWeight: "800",
-  },
-  sectionSubtitle: {
-    color: "#8ea7bd",
-    fontSize: 14,
-    marginTop: 4,
-    lineHeight: 20,
   },
   genreSummaryRow: {
     flexDirection: "row",
@@ -648,22 +663,18 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   genreSummaryChip: {
-    backgroundColor: "#132131",
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
   genreSummaryText: {
-    color: "#d8e5f2",
     fontSize: 13,
     fontWeight: "700",
   },
   paginationCard: {
     marginTop: 10,
-    backgroundColor: "#0f1b28",
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "rgba(167, 199, 231, 0.1)",
     paddingHorizontal: 16,
     paddingVertical: 16,
   },
@@ -671,12 +682,10 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   paginationTitle: {
-    color: "#f4f7fb",
     fontSize: 17,
     fontWeight: "700",
   },
   paginationSubtitle: {
-    color: "#8ea7bd",
     fontSize: 13,
     marginTop: 4,
     lineHeight: 19,
@@ -689,27 +698,13 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 48,
     borderRadius: 8,
-    backgroundColor: "#132131",
     justifyContent: "center",
     alignItems: "center",
     flexDirection: "row",
     gap: 6,
   },
-  paginationButtonAccent: {
-    backgroundColor: "#f5c451",
-  },
-  paginationButtonDisabled: {
-    backgroundColor: "#101a26",
-  },
   paginationButtonText: {
-    color: "#f4f7fb",
     fontSize: 14,
     fontWeight: "800",
-  },
-  paginationButtonTextAccent: {
-    color: "#08111b",
-  },
-  paginationButtonTextDisabled: {
-    color: "#5f7388",
   },
 });
