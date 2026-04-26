@@ -1,34 +1,32 @@
 import React from "react";
 import {
-  View,
-  Text,
   Image,
   StyleSheet,
+  Text,
   TouchableOpacity,
+  View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { type Href, useRouter } from "expo-router";
-import { useThemeMode } from "@/components/theme-mode-provider";
 
-interface TrailerProps {
-  id: string;
+import { useThemeMode } from "@/shared/model";
+
+export type MovieTrailerCardProps = {
   title: string;
   thumbnail: string;
-  yt_id: string;
   rating: number;
   published: string;
   genres: string[];
-}
+  onPress?: () => void;
+};
 
-export default function Trailer({
-  id,
+export default function MovieTrailerCard({
   title,
   thumbnail,
   rating,
   published,
   genres,
-}: TrailerProps) {
-  const router = useRouter();
+  onPress,
+}: MovieTrailerCardProps) {
   const { themeMode } = useThemeMode();
   const isLight = themeMode === "light";
 
@@ -54,20 +52,12 @@ export default function Trailer({
 
   return (
     <TouchableOpacity
-      key={id}
       style={[
         styles.card,
         { backgroundColor: palette.card, borderColor: palette.border },
       ]}
       activeOpacity={0.9}
-      onPress={() =>
-        router.push(
-          {
-            pathname: "/movie/[id]",
-            params: { id },
-          } as unknown as Href,
-        )
-      }
+      onPress={onPress}
     >
       <View style={styles.media}>
         <Image source={{ uri: thumbnail }} style={styles.thumbnail} />
@@ -132,15 +122,12 @@ export default function Trailer({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#0d1622",
     width: "100%",
     alignSelf: "stretch",
-    position: "relative",
     borderRadius: 8,
     overflow: "hidden",
     marginBottom: 18,
     borderWidth: 1,
-    borderColor: "rgba(167, 199, 231, 0.14)",
   },
   media: {
     width: "100%",

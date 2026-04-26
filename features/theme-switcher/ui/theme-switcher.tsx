@@ -2,9 +2,9 @@ import React from "react";
 import { StyleSheet, Switch, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
-import { useThemeMode } from "@/components/theme-mode-provider";
+import { useThemeMode } from "@/shared/model";
 
-export default function ThemeToggle() {
+export default function ThemeSwitcher() {
   const { themeMode, setThemeMode } = useThemeMode();
   const isLight = themeMode === "light";
 

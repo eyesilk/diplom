@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { useColorScheme as useDeviceColorScheme } from "react-native";
 
-type ThemeMode = "light" | "dark";
+export type ThemeMode = "light" | "dark";
 
 type ThemeModeContextValue = {
   themeMode: ThemeMode;
@@ -47,7 +47,7 @@ export function ThemeModeProvider({
           setThemeMode(storedThemeMode);
         }
       } catch {
-        // Keep the device theme if storage is temporarily unavailable.
+        // Keep the device fallback theme if storage is unavailable.
       } finally {
         if (isMounted) {
           setIsHydrated(true);
@@ -68,7 +68,7 @@ export function ThemeModeProvider({
     }
 
     AsyncStorage.setItem(THEME_MODE_STORAGE_KEY, themeMode).catch(() => {
-      // Theme switching should still work even if persistence fails.
+      // Ignore persistence failures to keep UI responsive.
     });
   }, [isHydrated, themeMode]);
 

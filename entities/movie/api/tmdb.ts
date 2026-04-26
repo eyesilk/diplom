@@ -22,10 +22,10 @@ type TmdbMovie = {
 };
 
 type TmdbGenresResponse = {
-  genres: Array<{
+  genres: {
     id: number;
     name: string;
-  }>;
+  }[];
 };
 
 type TmdbVideosResponse = {
@@ -54,35 +54,35 @@ type TmdbMovieDetailsResponse = {
   status: string;
   backdrop_path: string | null;
   poster_path: string | null;
-  genres: Array<{
+  genres: {
     id: number;
     name: string;
-  }>;
-  production_countries: Array<{
+  }[];
+  production_countries: {
     iso_3166_1: string;
     name: string;
-  }>;
-  spoken_languages: Array<{
+  }[];
+  spoken_languages: {
     english_name: string;
     name: string;
-  }>;
-  production_companies: Array<{
+  }[];
+  production_companies: {
     id: number;
     name: string;
-  }>;
+  }[];
   credits: {
-    cast: Array<{
+    cast: {
       id: number;
       name: string;
       character: string;
       profile_path: string | null;
-    }>;
-    crew: Array<{
+    }[];
+    crew: {
       id: number;
       name: string;
       job: string;
       department: string;
-    }>;
+    }[];
   };
   videos: TmdbVideosResponse;
 };
@@ -158,21 +158,12 @@ export type MovieDetails = {
   companies: string[];
   director: string | null;
   writers: string[];
-  cast: Array<{
+  cast: {
     id: string;
     name: string;
     character: string;
     photo: string | null;
-  }>;
-};
-
-const formatToday = () => {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = `${today.getMonth() + 1}`.padStart(2, "0");
-  const day = `${today.getDate()}`.padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
+  }[];
 };
 
 const createDiscoverConfig = (
@@ -337,7 +328,7 @@ const mapMoviesToTrailers = async (
   return trailers.filter((trailer): trailer is TrailerItem => Boolean(trailer));
 };
 
-export const fetchTmdbTrailersCollection = async (
+export const fetchMovieTrailersCollection = async (
   collection: TrailerCollectionKey,
   page: number,
   minResults = 12,
@@ -404,10 +395,12 @@ export const fetchTmdbTrailersCollection = async (
   };
 };
 
-export const fetchTmdbSearchIndex = async (): Promise<TrailerItem[]> => {
+export const fetchMovieSearchIndex = async (): Promise<TrailerItem[]> => {
   const collections = await Promise.all(
     TRAILER_COLLECTIONS.map(({ key }) =>
-      fetchTmdbTrailersCollection(key, 1, 12).then((response) => response.results),
+      fetchMovieTrailersCollection(key, 1, 12).then(
+        (response) => response.results,
+      ),
     ),
   );
 

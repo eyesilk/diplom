@@ -10,10 +10,7 @@ import "react-native-reanimated";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import {
-  ThemeModeProvider,
-  useThemeMode,
-} from "@/components/theme-mode-provider";
+import { ThemeModeProvider, useThemeMode } from "@/shared/model";
 
 const queryClient = new QueryClient();
 

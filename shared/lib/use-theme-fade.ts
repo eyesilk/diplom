@@ -5,7 +5,7 @@ export function useThemeFade(trigger: string) {
   const opacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    opacity.setValue(0.82);
+    opacity.setValue(0.92);
 
     Animated.timing(opacity, {
       toValue: 1,
