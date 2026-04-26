@@ -404,6 +404,18 @@ export const fetchTmdbTrailersCollection = async (
   };
 };
 
+export const fetchTmdbSearchIndex = async (): Promise<TrailerItem[]> => {
+  const collections = await Promise.all(
+    TRAILER_COLLECTIONS.map(({ key }) =>
+      fetchTmdbTrailersCollection(key, 1, 12).then((response) => response.results),
+    ),
+  );
+
+  return Array.from(
+    new Map(collections.flat().map((trailer) => [trailer.id, trailer])).values(),
+  );
+};
+
 export const fetchMovieDetails = async (
   movieId: string,
 ): Promise<MovieDetails> => {

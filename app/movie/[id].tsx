@@ -16,6 +16,8 @@ import { Ionicons } from "@expo/vector-icons";
 import YoutubePlayer from "react-native-youtube-iframe";
 import Svg, { Circle } from "react-native-svg";
 
+import ThemeToggle from "@/components/theme-toggle";
+import { useThemeMode } from "@/components/theme-mode-provider";
 import { fetchMovieDetails } from "@/constants/tmdb";
 
 function formatDate(value: string) {
@@ -57,7 +59,17 @@ function getScoreColor(score: number) {
   return "#21d07a";
 }
 
-function ScoreRing({ score }: { score: number }) {
+function ScoreRing({
+  score,
+  backgroundColor,
+  textColor,
+  mutedTextColor,
+}: {
+  score: number;
+  backgroundColor: string;
+  textColor: string;
+  mutedTextColor: string;
+}) {
   const size = 72;
   const strokeWidth = 7;
   const radius = (size - strokeWidth) / 2;
@@ -90,9 +102,13 @@ function ScoreRing({ score }: { score: number }) {
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
       </Svg>
-      <View style={styles.scoreRingInner}>
-        <Text style={styles.scoreRingValue}>{score.toFixed(1)}</Text>
-        <Text style={styles.scoreRingLabel}>/10</Text>
+      <View style={[styles.scoreRingInner, { backgroundColor }]}>
+        <Text style={[styles.scoreRingValue, { color: textColor }]}>
+          {score.toFixed(1)}
+        </Text>
+        <Text style={[styles.scoreRingLabel, { color: mutedTextColor }]}>
+          /10
+        </Text>
       </View>
     </View>
   );
@@ -101,14 +117,20 @@ function ScoreRing({ score }: { score: number }) {
 function SectionHeading({
   title,
   subtitle,
+  textColor,
+  mutedTextColor,
 }: {
   title: string;
   subtitle: string;
+  textColor: string;
+  mutedTextColor: string;
 }) {
   return (
     <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <Text style={styles.sectionSubtitle}>{subtitle}</Text>
+      <Text style={[styles.sectionTitle, { color: textColor }]}>{title}</Text>
+      <Text style={[styles.sectionSubtitle, { color: mutedTextColor }]}>
+        {subtitle}
+      </Text>
     </View>
   );
 }
@@ -117,19 +139,37 @@ function FactItem({
   icon,
   label,
   value,
+  palette,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value: string;
+  palette: {
+    surface: string;
+    surfaceAlt: string;
+    text: string;
+    textMuted: string;
+    border: string;
+    accent: string;
+  };
 }) {
   return (
-    <View style={styles.factItem}>
-      <View style={styles.factIconWrap}>
-        <Ionicons name={icon} size={18} color="#f5c451" />
+    <View
+      style={[
+        styles.factItem,
+        { backgroundColor: palette.surface, borderColor: palette.border },
+      ]}
+    >
+      <View
+        style={[styles.factIconWrap, { backgroundColor: palette.surfaceAlt }]}
+      >
+        <Ionicons name={icon} size={18} color={palette.accent} />
       </View>
       <View style={styles.factTextWrap}>
-        <Text style={styles.factLabel}>{label}</Text>
-        <Text style={styles.factValue}>{value}</Text>
+        <Text style={[styles.factLabel, { color: palette.textMuted }]}>
+          {label}
+        </Text>
+        <Text style={[styles.factValue, { color: palette.text }]}>{value}</Text>
       </View>
     </View>
   );
@@ -139,6 +179,40 @@ export default function MovieDetailsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const movieId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const { themeMode } = useThemeMode();
+  const isLight = themeMode === "light";
+
+  const palette = isLight
+    ? {
+        background: "#f4f6f8",
+        surface: "#ffffff",
+        surfaceAlt: "#eef3f7",
+        surfaceStrong: "#e7eef5",
+        text: "#0d1722",
+        textMuted: "#61778b",
+        border: "#dde6ee",
+        overlay: "rgba(6, 11, 18, 0.28)",
+        backButton: "rgba(255, 255, 255, 0.92)",
+        backButtonText: "#0d1722",
+        accent: "#112639",
+        accentText: "#ffffff",
+        chip: "#eef3f7",
+      }
+    : {
+        background: "#08111b",
+        surface: "#0f1b28",
+        surfaceAlt: "#132131",
+        surfaceStrong: "#182738",
+        text: "#f4f7fb",
+        textMuted: "#8ea7bd",
+        border: "rgba(167, 199, 231, 0.12)",
+        overlay: "rgba(6, 11, 18, 0.5)",
+        backButton: "rgba(8, 17, 27, 0.72)",
+        backButtonText: "#f4f7fb",
+        accent: "#f5c451",
+        accentText: "#0c1520",
+        chip: "#23384d",
+      };
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["movie-details", movieId],
@@ -148,25 +222,39 @@ export default function MovieDetailsScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingScreen}>
-        <ActivityIndicator size="large" color="#f5c451" />
-        <Text style={styles.loadingText}>Загружаем фильм</Text>
+      <View
+        style={[styles.loadingScreen, { backgroundColor: palette.background }]}
+      >
+        <ActivityIndicator size="large" color={palette.accent} />
+        <Text style={[styles.loadingText, { color: palette.textMuted }]}>
+          Загружаем фильм
+        </Text>
       </View>
     );
   }
 
   if (isError || !data) {
     return (
-      <SafeAreaView style={styles.errorScreen} edges={["top", "bottom"]}>
-        <TouchableOpacity
-          style={styles.backButtonStatic}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={20} color="#f4f7fb" />
-          <Text style={styles.backButtonText}>К трейлерам</Text>
-        </TouchableOpacity>
-        <Text style={styles.errorTitle}>Не удалось загрузить фильм</Text>
-        <Text style={styles.errorSubtitle}>
+      <SafeAreaView
+        style={[styles.errorScreen, { backgroundColor: palette.background }]}
+        edges={["top", "bottom"]}
+      >
+        <View style={styles.errorTopBar}>
+          <TouchableOpacity
+            style={[styles.backButtonStatic, { backgroundColor: palette.surfaceAlt }]}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={20} color={palette.backButtonText} />
+            <Text style={[styles.backButtonText, { color: palette.backButtonText }]}>
+              К трейлерам
+            </Text>
+          </TouchableOpacity>
+          <ThemeToggle />
+        </View>
+        <Text style={[styles.errorTitle, { color: palette.text }]}>
+          Не удалось загрузить фильм
+        </Text>
+        <Text style={[styles.errorSubtitle, { color: palette.textMuted }]}>
           Попробуй вернуться к списку и открыть карточку еще раз.
         </Text>
       </SafeAreaView>
@@ -182,7 +270,7 @@ export default function MovieDetailsScreen() {
   ].filter((item): item is string => Boolean(item));
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: palette.background }]}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         <ImageBackground
           source={
@@ -192,15 +280,26 @@ export default function MovieDetailsScreen() {
           }
           style={styles.hero}
         >
-          <View style={styles.heroOverlay} />
+          <View style={[styles.heroOverlay, { backgroundColor: palette.overlay }]} />
           <SafeAreaView style={styles.heroSafeArea} edges={["top"]}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => router.back()}
-            >
-              <Ionicons name="arrow-back" size={20} color="#f4f7fb" />
-              <Text style={styles.backButtonText}>Назад</Text>
-            </TouchableOpacity>
+            <View style={styles.heroTopBar}>
+              <TouchableOpacity
+                style={[styles.backButton, { backgroundColor: palette.backButton }]}
+                onPress={() => router.back()}
+              >
+                <Ionicons
+                  name="arrow-back"
+                  size={20}
+                  color={palette.backButtonText}
+                />
+                <Text
+                  style={[styles.backButtonText, { color: palette.backButtonText }]}
+                >
+                  Назад
+                </Text>
+              </TouchableOpacity>
+              <ThemeToggle />
+            </View>
           </SafeAreaView>
         </ImageBackground>
 
@@ -209,53 +308,95 @@ export default function MovieDetailsScreen() {
             {data.poster ? (
               <Image source={{ uri: data.poster }} style={styles.poster} />
             ) : (
-              <View style={[styles.poster, styles.posterFallback]}>
-                <Ionicons name="film-outline" size={42} color="#9cb3c8" />
+              <View
+                style={[
+                  styles.poster,
+                  styles.posterFallback,
+                  { backgroundColor: palette.surfaceAlt },
+                ]}
+              >
+                <Ionicons name="film-outline" size={42} color={palette.textMuted} />
               </View>
             )}
           </View>
 
-          <View style={styles.summaryCard}>
-            {data.tagline ? <Text style={styles.tagline}>{data.tagline}</Text> : null}
+          <View
+            style={[
+              styles.summaryCard,
+              { backgroundColor: palette.surface, borderColor: palette.border },
+            ]}
+          >
+            {data.tagline ? (
+              <Text style={[styles.tagline, { color: palette.accent }]}>
+                {data.tagline}
+              </Text>
+            ) : null}
 
-            <Text style={styles.title}>{data.title}</Text>
+            <Text style={[styles.title, { color: palette.text }]}>{data.title}</Text>
 
             {data.originalTitle !== data.title ? (
-              <Text style={styles.originalTitle}>{data.originalTitle}</Text>
+              <Text style={[styles.originalTitle, { color: palette.textMuted }]}>
+                {data.originalTitle}
+              </Text>
             ) : null}
 
             <View style={styles.chipRow}>
               {infoChips.map((chip) => (
-                <View key={chip} style={styles.infoChip}>
-                  <Text style={styles.infoChipText}>{chip}</Text>
+                <View
+                  key={chip}
+                  style={[styles.infoChip, { backgroundColor: palette.surfaceAlt }]}
+                >
+                  <Text style={[styles.infoChipText, { color: palette.text }]}>
+                    {chip}
+                  </Text>
                 </View>
               ))}
             </View>
 
-            <View style={styles.scoreSection}>
-              <ScoreRing score={data.rating} />
+            <View
+              style={[
+                styles.scoreSection,
+                { backgroundColor: palette.surfaceAlt },
+              ]}
+            >
+              <ScoreRing
+                score={data.rating}
+                backgroundColor={palette.surfaceStrong}
+                textColor={palette.text}
+                mutedTextColor={palette.textMuted}
+              />
               <View style={styles.scoreTextBlock}>
-                <Text style={styles.scoreHeading}>Пользовательский рейтинг</Text>
-                <Text style={styles.scoreCaption}>
-                  Оценка TMDB на основе {data.voteCount.toLocaleString("ru-RU")} голосов
+                <Text style={[styles.scoreHeading, { color: palette.text }]}>
+                  Пользовательский рейтинг
+                </Text>
+                <Text style={[styles.scoreCaption, { color: palette.textMuted }]}>
+                  Оценка TMDB на основе{" "}
+                  {data.voteCount.toLocaleString("ru-RU")} голосов
                 </Text>
               </View>
             </View>
 
             <View style={styles.genreRow}>
               {data.genres.map((genre) => (
-                <View key={genre} style={styles.genreChip}>
-                  <Text style={styles.genreChipText}>{genre}</Text>
+                <View
+                  key={genre}
+                  style={[styles.genreChip, { backgroundColor: palette.chip }]}
+                >
+                  <Text style={[styles.genreChipText, { color: palette.text }]}>
+                    {genre}
+                  </Text>
                 </View>
               ))}
             </View>
 
             {data.director ? (
-              <Text style={styles.creditLine}>Режиссер: {data.director}</Text>
+              <Text style={[styles.creditLine, { color: palette.text }]}>
+                Режиссер: {data.director}
+              </Text>
             ) : null}
 
             {data.writers.length ? (
-              <Text style={styles.creditLine}>
+              <Text style={[styles.creditLine, { color: palette.text }]}>
                 Сценарий: {data.writers.slice(0, 3).join(", ")}
               </Text>
             ) : null}
@@ -267,61 +408,94 @@ export default function MovieDetailsScreen() {
             <SectionHeading
               title="Трейлер"
               subtitle="Смотри прямо на странице фильма"
+              textColor={palette.text}
+              mutedTextColor={palette.textMuted}
             />
-            <View style={styles.playerWrap}>
+            <View
+              style={[
+                styles.playerWrap,
+                { backgroundColor: palette.surface, borderColor: palette.border },
+              ]}
+            >
               <YoutubePlayer height={220} play={false} videoId={data.trailerKey} />
             </View>
           </View>
         ) : null}
 
         <View style={styles.section}>
-          <SectionHeading title="Описание" subtitle="Коротко о сюжете" />
-          <View style={styles.textCard}>
-            <Text style={styles.overview}>
+          <SectionHeading
+            title="Описание"
+            subtitle="Коротко о сюжете"
+            textColor={palette.text}
+            mutedTextColor={palette.textMuted}
+          />
+          <View
+            style={[
+              styles.textCard,
+              { backgroundColor: palette.surface, borderColor: palette.border },
+            ]}
+          >
+            <Text style={[styles.overview, { color: palette.text }]}>
               {data.overview || "Для этого фильма пока нет описания."}
             </Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <SectionHeading title="О фильме" subtitle="Основные детали" />
+          <SectionHeading
+            title="О фильме"
+            subtitle="Основные детали"
+            textColor={palette.text}
+            mutedTextColor={palette.textMuted}
+          />
           <View style={styles.factsGrid}>
             <FactItem
               icon="calendar-outline"
               label="Дата выхода"
               value={formatDate(data.releaseDate)}
+              palette={palette}
             />
             <FactItem
               icon="time-outline"
               label="Хронометраж"
               value={formatRuntime(data.runtime)}
+              palette={palette}
             />
             <FactItem
               icon="globe-outline"
               label="Страны"
               value={data.countries.slice(0, 2).join(", ") || "Неизвестно"}
+              palette={palette}
             />
             <FactItem
               icon="chatbubble-ellipses-outline"
               label="Языки"
               value={data.languages.slice(0, 2).join(", ") || "Неизвестно"}
+              palette={palette}
             />
             <FactItem
               icon="videocam-outline"
               label="Статус"
               value={data.status || "Неизвестно"}
+              palette={palette}
             />
             <FactItem
               icon="business-outline"
               label="Студии"
               value={data.companies.slice(0, 2).join(", ") || "Неизвестно"}
+              palette={palette}
             />
           </View>
         </View>
 
         {data.cast.length ? (
           <View style={styles.castSection}>
-            <SectionHeading title="Актеры" subtitle="Основной состав" />
+            <SectionHeading
+              title="Актеры"
+              subtitle="Основной состав"
+              textColor={palette.text}
+              mutedTextColor={palette.textMuted}
+            />
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -332,14 +506,30 @@ export default function MovieDetailsScreen() {
                   {member.photo ? (
                     <Image source={{ uri: member.photo }} style={styles.castPhoto} />
                   ) : (
-                    <View style={[styles.castPhoto, styles.castFallback]}>
-                      <Ionicons name="person-outline" size={28} color="#9cb3c8" />
+                    <View
+                      style={[
+                        styles.castPhoto,
+                        styles.castFallback,
+                        { backgroundColor: palette.surfaceAlt },
+                      ]}
+                    >
+                      <Ionicons
+                        name="person-outline"
+                        size={28}
+                        color={palette.textMuted}
+                      />
                     </View>
                   )}
-                  <Text numberOfLines={2} style={styles.castName}>
+                  <Text
+                    numberOfLines={2}
+                    style={[styles.castName, { color: palette.text }]}
+                  >
                     {member.name}
                   </Text>
-                  <Text numberOfLines={2} style={styles.castRole}>
+                  <Text
+                    numberOfLines={2}
+                    style={[styles.castRole, { color: palette.textMuted }]}
+                  >
                     {member.character || "Роль не указана"}
                   </Text>
                 </View>
@@ -349,11 +539,15 @@ export default function MovieDetailsScreen() {
         ) : null}
 
         <TouchableOpacity
-          style={styles.bottomBackButton}
+          style={[styles.bottomBackButton, { backgroundColor: palette.accent }]}
           onPress={() => router.back()}
         >
-          <Ionicons name="chevron-back" size={18} color="#0c1520" />
-          <Text style={styles.bottomBackButtonText}>Вернуться к трейлерам</Text>
+          <Ionicons name="chevron-back" size={18} color={palette.accentText} />
+          <Text
+            style={[styles.bottomBackButtonText, { color: palette.accentText }]}
+          >
+            Вернуться к трейлерам
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -363,7 +557,6 @@ export default function MovieDetailsScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#08111b",
   },
   scroll: {
     flex: 1,
@@ -373,29 +566,30 @@ const styles = StyleSheet.create({
   },
   loadingScreen: {
     flex: 1,
-    backgroundColor: "#08111b",
     justifyContent: "center",
     alignItems: "center",
     gap: 12,
   },
   loadingText: {
-    color: "#d6e2ee",
     fontSize: 16,
   },
   errorScreen: {
     flex: 1,
-    backgroundColor: "#08111b",
     paddingHorizontal: 20,
     justifyContent: "center",
   },
+  errorTopBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 28,
+  },
   errorTitle: {
-    color: "#f4f7fb",
     fontSize: 28,
     fontWeight: "700",
     marginTop: 28,
   },
   errorSubtitle: {
-    color: "#9cb3c8",
     fontSize: 16,
     lineHeight: 24,
     marginTop: 10,
@@ -406,34 +600,35 @@ const styles = StyleSheet.create({
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(6, 11, 18, 0.5)",
   },
   heroSafeArea: {
     paddingHorizontal: 20,
+  },
+  heroTopBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
   },
   backButton: {
     alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "rgba(8, 17, 27, 0.72)",
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    marginTop: 8,
   },
   backButtonStatic: {
     alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#152434",
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
   backButtonText: {
-    color: "#f4f7fb",
     fontSize: 15,
     fontWeight: "600",
   },
@@ -459,29 +654,24 @@ const styles = StyleSheet.create({
   summaryCard: {
     width: "100%",
     marginTop: 18,
-    backgroundColor: "#0d1622",
     borderRadius: 8,
     paddingHorizontal: 18,
     paddingVertical: 20,
     borderWidth: 1,
-    borderColor: "rgba(167, 199, 231, 0.12)",
   },
   tagline: {
-    color: "#f5c451",
     fontSize: 14,
     fontWeight: "600",
     marginBottom: 8,
     textAlign: "center",
   },
   title: {
-    color: "#f4f7fb",
     fontSize: 30,
     fontWeight: "800",
     lineHeight: 36,
     textAlign: "center",
   },
   originalTitle: {
-    color: "#9cb3c8",
     fontSize: 15,
     marginTop: 8,
     textAlign: "center",
@@ -494,13 +684,11 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   infoChip: {
-    backgroundColor: "#132131",
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
   infoChipText: {
-    color: "#d8e5f2",
     fontSize: 13,
     fontWeight: "600",
   },
@@ -510,7 +698,6 @@ const styles = StyleSheet.create({
     gap: 14,
     marginTop: 20,
     padding: 14,
-    backgroundColor: "#132131",
     borderRadius: 8,
   },
   scoreRingWrap: {
@@ -526,18 +713,15 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: "#0b1623",
     justifyContent: "center",
     alignItems: "center",
   },
   scoreRingValue: {
-    color: "#f4f7fb",
     fontSize: 18,
     fontWeight: "800",
     lineHeight: 20,
   },
   scoreRingLabel: {
-    color: "#8ea7bd",
     fontSize: 10,
     fontWeight: "700",
     marginTop: 1,
@@ -546,13 +730,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scoreHeading: {
-    color: "#f4f7fb",
     fontSize: 16,
     fontWeight: "700",
     marginBottom: 4,
   },
   scoreCaption: {
-    color: "#9cb3c8",
     fontSize: 13,
     lineHeight: 19,
   },
@@ -563,18 +745,15 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   genreChip: {
-    backgroundColor: "#23384d",
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   genreChipText: {
-    color: "#f2f6fa",
     fontSize: 13,
     fontWeight: "600",
   },
   creditLine: {
-    color: "#d6e2ee",
     fontSize: 14,
     lineHeight: 21,
     marginTop: 12,
@@ -591,32 +770,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   sectionTitle: {
-    color: "#f4f7fb",
     fontSize: 24,
     fontWeight: "800",
   },
   sectionSubtitle: {
-    color: "#8ea7bd",
     fontSize: 14,
     marginTop: 4,
   },
   playerWrap: {
     borderRadius: 8,
     overflow: "hidden",
-    backgroundColor: "#0f1b28",
     borderWidth: 1,
-    borderColor: "rgba(167, 199, 231, 0.12)",
   },
   textCard: {
-    backgroundColor: "#0f1b28",
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderWidth: 1,
-    borderColor: "rgba(167, 199, 231, 0.1)",
   },
   overview: {
-    color: "#d6e2ee",
     fontSize: 16,
     lineHeight: 25,
   },
@@ -627,18 +799,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
-    backgroundColor: "#0f1b28",
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderWidth: 1,
-    borderColor: "rgba(167, 199, 231, 0.1)",
   },
   factIconWrap: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#182738",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -646,12 +815,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   factLabel: {
-    color: "#8ea7bd",
     fontSize: 13,
     marginBottom: 4,
   },
   factValue: {
-    color: "#f4f7fb",
     fontSize: 15,
     lineHeight: 22,
     fontWeight: "600",
@@ -674,14 +841,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   castName: {
-    color: "#f4f7fb",
     fontSize: 14,
     fontWeight: "700",
     marginTop: 10,
     lineHeight: 20,
   },
   castRole: {
-    color: "#8ea7bd",
     fontSize: 13,
     marginTop: 4,
     lineHeight: 18,
@@ -689,7 +854,6 @@ const styles = StyleSheet.create({
   bottomBackButton: {
     marginTop: 30,
     marginHorizontal: 20,
-    backgroundColor: "#f5c451",
     borderRadius: 8,
     flexDirection: "row",
     justifyContent: "center",
@@ -698,7 +862,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   bottomBackButtonText: {
-    color: "#0c1520",
     fontSize: 16,
     fontWeight: "800",
   },

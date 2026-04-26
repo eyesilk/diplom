@@ -1,7 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  FlatList,
   ImageBackground,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -9,13 +13,14 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 
 import ThemeToggle from "@/components/theme-toggle";
 import { useThemeMode } from "@/components/theme-mode-provider";
-import { fetchTmdbTrailersCollection } from "@/constants/tmdb";
+import { fetchTmdbTrailersCollection, type TrailerItem } from "@/constants/tmdb";
+import { useThemeFade } from "@/hooks/use-theme-fade";
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("ru-RU", {
@@ -26,13 +31,17 @@ function formatDate(value: string) {
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const sliderRef = useRef<FlatList<TrailerItem>>(null);
+  const activeSlideRef = useRef(0);
   const { width } = useWindowDimensions();
   const { themeMode } = useThemeMode();
+  const fadeOpacity = useThemeFade(themeMode);
   const [activeSlide, setActiveSlide] = useState(0);
 
   const isLight = themeMode === "light";
   const isTablet = width >= 768;
   const isLargeScreen = width >= 1024;
+  const sliderWidth = width - 40;
 
   const heroTitleSize = isLargeScreen ? 76 : isTablet ? 60 : 46;
   const subtitleSize = isLargeScreen ? 22 : isTablet ? 18 : 16;
@@ -43,7 +52,10 @@ export default function WelcomeScreen() {
   });
 
   const slides = useMemo(() => data?.results.slice(0, 5) ?? [], [data]);
-  const currentSlide = slides[activeSlide] ?? null;
+
+  useEffect(() => {
+    activeSlideRef.current = activeSlide;
+  }, [activeSlide]);
 
   useEffect(() => {
     if (slides.length <= 1) {
@@ -51,17 +63,112 @@ export default function WelcomeScreen() {
     }
 
     const interval = setInterval(() => {
-      setActiveSlide((current) => (current + 1) % slides.length);
-    }, 3800);
+      const next = (activeSlideRef.current + 1) % slides.length;
+      activeSlideRef.current = next;
+      setActiveSlide(next);
+      sliderRef.current?.scrollToIndex({ index: next, animated: true });
+    }, 4200);
 
     return () => clearInterval(interval);
   }, [slides.length]);
 
   useEffect(() => {
     if (activeSlide >= slides.length) {
+      activeSlideRef.current = 0;
       setActiveSlide(0);
     }
   }, [activeSlide, slides.length]);
+
+  const handleSliderScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (slides.length === 0) {
+        return;
+      }
+
+      const index = Math.round(event.nativeEvent.contentOffset.x / sliderWidth);
+      const boundedIndex = Math.max(0, Math.min(index, slides.length - 1));
+
+      if (boundedIndex !== activeSlideRef.current) {
+        activeSlideRef.current = boundedIndex;
+        setActiveSlide(boundedIndex);
+      }
+    },
+    [sliderWidth, slides.length],
+  );
+
+  const renderSlide = ({ item }: { item: TrailerItem }) => (
+    <TouchableOpacity
+      activeOpacity={0.94}
+      onPress={() =>
+        router.push(
+          {
+            pathname: "/movie/[id]",
+            params: { id: item.id },
+          } as unknown as Href,
+        )
+      }
+      style={{ width: sliderWidth }}
+    >
+      <ImageBackground
+        source={{ uri: item.thumbnail }}
+        style={styles.slideImage}
+        imageStyle={styles.slideImageStyle}
+      >
+        <View style={styles.slideOverlay} />
+        <View style={styles.slideContent}>
+          <View style={styles.slideTopRow}>
+            <View
+              style={[
+                styles.slidePill,
+                isLight ? styles.slidePillLight : styles.slidePillDark,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.slidePillText,
+                  isLight && styles.slidePillTextLight,
+                ]}
+              >
+                Сейчас смотрят
+              </Text>
+            </View>
+
+            <View style={styles.slideTapHint}>
+              <Ionicons name="open-outline" size={14} color="#f4f7fb" />
+            </View>
+          </View>
+
+          <Text style={styles.slideTitle}>{item.title}</Text>
+
+          <View style={styles.slideMetaRow}>
+            <View style={styles.slideMetaPill}>
+              <Ionicons name="star" size={14} color="#f5c451" />
+              <Text style={styles.slideMetaText}>{item.rating.toFixed(1)}</Text>
+            </View>
+
+            <View style={styles.slideMetaPill}>
+              <Ionicons
+                name="calendar-outline"
+                size={14}
+                color="#d6e2ee"
+              />
+              <Text style={styles.slideMetaText}>
+                {formatDate(item.releaseDate)}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.slideGenreRow}>
+            {item.genres.slice(0, 3).map((genre) => (
+              <View key={genre} style={styles.slideGenreChip}>
+                <Text style={styles.slideGenreText}>{genre}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      </ImageBackground>
+    </TouchableOpacity>
+  );
 
   return (
     <View
@@ -87,84 +194,87 @@ export default function WelcomeScreen() {
         </ImageBackground>
       )}
 
-      <SafeAreaView
-        style={styles.safeArea}
-        edges={["top", "left", "right", "bottom"]}
-      >
-        <View style={styles.topBar}>
-          <View style={[styles.brandPill, isLight && styles.brandPillLight]}>
-            <Ionicons
-              name="film-outline"
-              size={16}
-              color={isLight ? "#0d1722" : "#f5c451"}
-            />
-            <Text style={[styles.brandText, isLight && styles.brandTextLight]}>
-              Trailers
-            </Text>
-          </View>
-
-          <ThemeToggle />
-        </View>
-
-        <View style={styles.hero}>
-          <View style={styles.copyBlock}>
-            <Text
-              style={[
-                styles.title,
-                {
-                  fontSize: heroTitleSize,
-                  lineHeight: heroTitleSize * 1.06,
-                  color: isLight ? "#0c1723" : "#f6f8fb",
-                },
-              ]}
-            >
-              Выбирай кино по настроению
-            </Text>
-
-            <Text
-              style={[
-                styles.subtitle,
-                {
-                  fontSize: subtitleSize,
-                  color: isLight ? "#506579" : "#c6d4e1",
-                },
-              ]}
-            >
-              Трейлеры, рейтинги и детали фильма в одном аккуратном потоке.
-            </Text>
-          </View>
-
-          <View
-            style={[
-              styles.sliderCard,
-              isLight ? styles.sliderCardLight : styles.sliderCardDark,
-            ]}
-          >
-            {currentSlide ? (
-              <ImageBackground
-                source={{ uri: currentSlide.thumbnail }}
-                style={styles.sliderImage}
-                imageStyle={styles.sliderImageStyle}
+      <Animated.View style={[styles.screen, { opacity: fadeOpacity }]}>
+        <SafeAreaView
+          style={styles.safeArea}
+          edges={["top", "left", "right", "bottom"]}
+        >
+          <View style={styles.topBar}>
+            <View style={[styles.brandPill, isLight && styles.brandPillLight]}>
+              <Ionicons
+                name="film-outline"
+                size={16}
+                color={isLight ? "#0d1722" : "#f5c451"}
+              />
+              <Text
+                style={[styles.brandText, isLight && styles.brandTextLight]}
               >
-                <View style={styles.sliderOverlay} />
-                <View style={styles.sliderContent}>
-                  <View style={styles.sliderTopRow}>
-                    <View
-                      style={[
-                        styles.sliderPill,
-                        isLight ? styles.sliderPillLight : styles.sliderPillDark,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.sliderPillText,
-                          isLight && styles.sliderPillTextLight,
-                        ]}
-                      >
-                        Сейчас смотрят
-                      </Text>
-                    </View>
+                Trailers
+              </Text>
+            </View>
 
+            <ThemeToggle />
+          </View>
+
+          <View style={styles.hero}>
+            <View style={styles.copyBlock}>
+              <Text
+                style={[
+                  styles.title,
+                  {
+                    fontSize: heroTitleSize,
+                    lineHeight: heroTitleSize * 1.06,
+                    color: isLight ? "#0c1723" : "#f6f8fb",
+                  },
+                ]}
+              >
+                Выбирай кино по настроению
+              </Text>
+
+              <Text
+                style={[
+                  styles.subtitle,
+                  {
+                    fontSize: subtitleSize,
+                    color: isLight ? "#506579" : "#c6d4e1",
+                  },
+                ]}
+              >
+                Трейлеры, рейтинги и детали фильма в одном аккуратном потоке.
+              </Text>
+            </View>
+
+            <View
+              style={[
+                styles.sliderShell,
+                isLight ? styles.sliderShellLight : styles.sliderShellDark,
+              ]}
+            >
+              {slides.length > 0 ? (
+                <>
+                  <FlatList
+                    ref={sliderRef}
+                    data={slides}
+                    keyExtractor={(item) => item.id}
+                    renderItem={renderSlide}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    decelerationRate="fast"
+                    bounces={false}
+                    snapToInterval={sliderWidth}
+                    snapToAlignment="start"
+                    onScroll={handleSliderScroll}
+                    scrollEventThrottle={16}
+                    getItemLayout={(_, index) => ({
+                      length: sliderWidth,
+                      offset: sliderWidth * index,
+                      index,
+                    })}
+                    onScrollToIndexFailed={() => undefined}
+                  />
+
+                  <View style={styles.sliderFooter}>
                     <View style={styles.sliderDots}>
                       {slides.map((slide, index) => (
                         <View
@@ -176,144 +286,129 @@ export default function WelcomeScreen() {
                         />
                       ))}
                     </View>
+
+                    <Text
+                      style={[
+                        styles.sliderHelperText,
+                        { color: isLight ? "#61778b" : "#9fb2c4" },
+                      ]}
+                    >
+                      Свайпни или нажми на фильм
+                    </Text>
                   </View>
-
-                  <Text style={styles.sliderTitle}>{currentSlide.title}</Text>
-
-                  <View style={styles.sliderMetaRow}>
-                    <View style={styles.sliderMetaPill}>
-                      <Ionicons name="star" size={14} color="#f5c451" />
-                      <Text style={styles.sliderMetaText}>
-                        {currentSlide.rating.toFixed(1)}
+                </>
+              ) : (
+                <View style={styles.sliderFallback}>
+                  {isLoading ? (
+                    <>
+                      <ActivityIndicator size="large" color="#f5c451" />
+                      <Text
+                        style={[
+                          styles.sliderFallbackText,
+                          { color: isLight ? "#61778b" : "#9fb2c4" },
+                        ]}
+                      >
+                        Собираем актуальные трейлеры
                       </Text>
-                    </View>
-
-                    <View style={styles.sliderMetaPill}>
+                    </>
+                  ) : (
+                    <>
                       <Ionicons
-                        name="calendar-outline"
-                        size={14}
-                        color="#d6e2ee"
+                        name="film-outline"
+                        size={34}
+                        color={isLight ? "#0d1722" : "#f5c451"}
                       />
-                      <Text style={styles.sliderMetaText}>
-                        {formatDate(currentSlide.releaseDate)}
+                      <Text
+                        style={[
+                          styles.sliderFallbackText,
+                          { color: isLight ? "#61778b" : "#9fb2c4" },
+                        ]}
+                      >
+                        Популярные фильмы и свежие трейлеры
                       </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.sliderGenreRow}>
-                    {currentSlide.genres.slice(0, 3).map((genre) => (
-                      <View key={genre} style={styles.sliderGenreChip}>
-                        <Text style={styles.sliderGenreText}>{genre}</Text>
-                      </View>
-                    ))}
-                  </View>
+                    </>
+                  )}
                 </View>
-              </ImageBackground>
-            ) : (
-              <View style={styles.sliderFallback}>
-                {isLoading ? (
-                  <>
-                    <ActivityIndicator size="large" color="#f5c451" />
-                    <Text
-                      style={[
-                        styles.sliderFallbackText,
-                        { color: isLight ? "#61778b" : "#9fb2c4" },
-                      ]}
-                    >
-                      Собираем актуальные трейлеры
-                    </Text>
-                  </>
-                ) : (
-                  <>
-                    <Ionicons
-                      name="film-outline"
-                      size={34}
-                      color={isLight ? "#0d1722" : "#f5c451"}
-                    />
-                    <Text
-                      style={[
-                        styles.sliderFallbackText,
-                        { color: isLight ? "#61778b" : "#9fb2c4" },
-                      ]}
-                    >
-                      Популярные фильмы и свежие трейлеры
-                    </Text>
-                  </>
-                )}
-              </View>
-            )}
+              )}
+            </View>
           </View>
-        </View>
 
-        <View style={styles.bottomArea}>
-          <TouchableOpacity
-            style={[styles.button, isLight ? styles.buttonLight : styles.buttonDark]}
-            onPress={() => router.push("/home")}
-            activeOpacity={0.85}
-          >
-            <Text
+          <View style={styles.bottomArea}>
+            <TouchableOpacity
               style={[
-                styles.buttonText,
-                { color: isLight ? "#ffffff" : "#08111b" },
+                styles.button,
+                isLight ? styles.buttonLight : styles.buttonDark,
               ]}
+              onPress={() => router.push("/home")}
+              activeOpacity={0.85}
             >
-              Начать просмотр
-            </Text>
-            <Ionicons
-              name="arrow-forward"
-              size={18}
-              color={isLight ? "#ffffff" : "#08111b"}
-            />
-          </TouchableOpacity>
-
-          <View style={styles.featureGrid}>
-            {[
-              {
-                title: "Подборки",
-                subtitle: "Популярное и жанры",
-                icon: "albums-outline",
-              },
-              {
-                title: "Карточки",
-                subtitle: "Рейтинг, актеры, описание",
-                icon: "document-text-outline",
-              },
-              {
-                title: "Трейлеры",
-                subtitle: "Быстрый переход к фильму",
-                icon: "play-circle-outline",
-              },
-            ].map((item) => (
-              <View
-                key={item.title}
-                style={[styles.featureCard, isLight && styles.featureCardLight]}
+              <Text
+                style={[
+                  styles.buttonText,
+                  { color: isLight ? "#ffffff" : "#08111b" },
+                ]}
               >
-                <Ionicons
-                  name={item.icon as keyof typeof Ionicons.glyphMap}
-                  size={18}
-                  color={isLight ? "#0d1722" : "#f5c451"}
-                />
-                <Text
+                Начать просмотр
+              </Text>
+              <Ionicons
+                name="arrow-forward"
+                size={18}
+                color={isLight ? "#ffffff" : "#08111b"}
+              />
+            </TouchableOpacity>
+
+            <View style={styles.featureGrid}>
+              {[
+                {
+                  title: "Подборки",
+                  subtitle: "Жанры и популярные релизы",
+                  icon: "albums-outline",
+                },
+                {
+                  title: "Карточки",
+                  subtitle: "Рейтинг, актеры и описание",
+                  icon: "document-text-outline",
+                },
+                {
+                  title: "Поиск",
+                  subtitle: "Быстрый доступ к нужному фильму",
+                  icon: "search-outline",
+                },
+              ].map((item) => (
+                <View
+                  key={item.title}
                   style={[
-                    styles.featureTitle,
-                    { color: isLight ? "#0d1722" : "#f4f7fb" },
+                    styles.featureCard,
+                    isLight && styles.featureCardLight,
                   ]}
                 >
-                  {item.title}
-                </Text>
-                <Text
-                  style={[
-                    styles.featureSubtitle,
-                    { color: isLight ? "#61778b" : "#8ea7bd" },
-                  ]}
-                >
-                  {item.subtitle}
-                </Text>
-              </View>
-            ))}
+                  <Ionicons
+                    name={item.icon as keyof typeof Ionicons.glyphMap}
+                    size={18}
+                    color={isLight ? "#0d1722" : "#f5c451"}
+                  />
+                  <Text
+                    style={[
+                      styles.featureTitle,
+                      { color: isLight ? "#0d1722" : "#f4f7fb" },
+                    ]}
+                  >
+                    {item.title}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.featureSubtitle,
+                      { color: isLight ? "#61778b" : "#8ea7bd" },
+                    ]}
+                  >
+                    {item.subtitle}
+                  </Text>
+                </View>
+              ))}
+            </View>
           </View>
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </Animated.View>
     </View>
   );
 }
@@ -418,59 +513,117 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     maxWidth: 460,
   },
-  sliderCard: {
-    minHeight: 260,
+  sliderShell: {
+    minHeight: 320,
     borderRadius: 8,
     overflow: "hidden",
   },
-  sliderCardDark: {
+  sliderShellDark: {
     backgroundColor: "rgba(10, 19, 30, 0.82)",
     borderWidth: 1,
     borderColor: "rgba(167, 199, 231, 0.14)",
   },
-  sliderCardLight: {
+  sliderShellLight: {
     backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: "#dde6ee",
   },
-  sliderImage: {
+  slideImage: {
     minHeight: 260,
     justifyContent: "flex-end",
   },
-  sliderImageStyle: {
+  slideImageStyle: {
     borderRadius: 8,
   },
-  sliderOverlay: {
+  slideOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(8, 16, 25, 0.42)",
   },
-  sliderContent: {
+  slideContent: {
     padding: 18,
   },
-  sliderTopRow: {
+  slideTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 16,
   },
-  sliderPill: {
+  slidePill: {
     borderRadius: 999,
     paddingHorizontal: 11,
     paddingVertical: 7,
   },
-  sliderPillDark: {
+  slidePillDark: {
     backgroundColor: "rgba(9, 18, 28, 0.72)",
   },
-  sliderPillLight: {
+  slidePillLight: {
     backgroundColor: "rgba(255,255,255,0.82)",
   },
-  sliderPillText: {
+  slidePillText: {
     color: "#f4f7fb",
     fontSize: 12,
     fontWeight: "800",
   },
-  sliderPillTextLight: {
+  slidePillTextLight: {
     color: "#0d1722",
+  },
+  slideTapHint: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(9, 18, 28, 0.72)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  slideTitle: {
+    color: "#f4f7fb",
+    fontSize: 28,
+    fontWeight: "800",
+    lineHeight: 34,
+    maxWidth: "88%",
+  },
+  slideMetaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 16,
+  },
+  slideMetaPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(9, 18, 28, 0.72)",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  slideMetaText: {
+    color: "#f4f7fb",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  slideGenreRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 14,
+  },
+  slideGenreChip: {
+    backgroundColor: "rgba(19, 33, 49, 0.92)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  slideGenreText: {
+    color: "#e3edf6",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  sliderFooter: {
+    paddingHorizontal: 18,
+    paddingBottom: 16,
+    paddingTop: 12,
+    alignItems: "center",
   },
   sliderDots: {
     flexDirection: "row",
@@ -480,58 +633,18 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: "rgba(255,255,255,0.35)",
+    backgroundColor: "rgba(143, 167, 189, 0.38)",
   },
   sliderDotActive: {
-    backgroundColor: "#f5c451",
     width: 18,
+    backgroundColor: "#f5c451",
   },
-  sliderTitle: {
-    color: "#f4f7fb",
-    fontSize: 28,
-    fontWeight: "800",
-    lineHeight: 34,
-    maxWidth: "88%",
-  },
-  sliderMetaRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginTop: 16,
-  },
-  sliderMetaPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "rgba(9, 18, 28, 0.72)",
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  sliderMetaText: {
-    color: "#f4f7fb",
+  sliderHelperText: {
     fontSize: 13,
-    fontWeight: "700",
-  },
-  sliderGenreRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 14,
-  },
-  sliderGenreChip: {
-    backgroundColor: "rgba(19, 33, 49, 0.92)",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  sliderGenreText: {
-    color: "#e3edf6",
-    fontSize: 12,
-    fontWeight: "700",
+    marginTop: 10,
   },
   sliderFallback: {
-    minHeight: 260,
+    minHeight: 320,
     justifyContent: "center",
     alignItems: "center",
     gap: 12,

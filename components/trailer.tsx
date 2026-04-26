@@ -5,7 +5,6 @@ import {
   Image,
   StyleSheet,
   TouchableOpacity,
-  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { type Href, useRouter } from "expo-router";
@@ -20,9 +19,6 @@ interface TrailerProps {
   published: string;
   genres: string[];
 }
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } =
-  Dimensions.get("window");
 
 export default function Trailer({
   id,
@@ -73,15 +69,21 @@ export default function Trailer({
         )
       }
     >
-      <Image source={{ uri: thumbnail }} style={styles.thumbnail} />
-      <View style={[styles.imageOverlay, { backgroundColor: palette.overlay }]} />
+      <View style={styles.media}>
+        <Image source={{ uri: thumbnail }} style={styles.thumbnail} />
+        <View
+          style={[styles.imageOverlay, { backgroundColor: palette.overlay }]}
+        />
 
-      <View style={styles.playBadge}>
-        <Ionicons name="play" size={18} color={palette.playIcon} />
+        <View style={styles.playBadge}>
+          <Ionicons name="play" size={18} color={palette.playIcon} />
+        </View>
       </View>
 
       <View style={[styles.content, { backgroundColor: palette.card }]}>
-        <Text style={[styles.title, { color: palette.text }]}>{title}</Text>
+        <Text numberOfLines={2} style={[styles.title, { color: palette.text }]}>
+          {title}
+        </Text>
 
         <View style={styles.metaRow}>
           <View style={[styles.metaPill, { backgroundColor: palette.pill }]}>
@@ -131,15 +133,23 @@ export default function Trailer({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: "#0d1622",
+    width: "100%",
+    alignSelf: "stretch",
+    position: "relative",
     borderRadius: 8,
     overflow: "hidden",
-    marginBottom: SCREEN_HEIGHT * 0.022,
+    marginBottom: 18,
     borderWidth: 1,
     borderColor: "rgba(167, 199, 231, 0.14)",
   },
+  media: {
+    width: "100%",
+    aspectRatio: 16 / 9,
+    position: "relative",
+  },
   thumbnail: {
     width: "100%",
-    height: SCREEN_HEIGHT * 0.28,
+    height: "100%",
     resizeMode: "cover",
   },
   imageOverlay: {
@@ -157,13 +167,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   content: {
-    paddingHorizontal: SCREEN_WIDTH * 0.04,
-    paddingTop: SCREEN_HEIGHT * 0.018,
-    paddingBottom: SCREEN_HEIGHT * 0.02,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 18,
   },
   title: {
-    fontSize: SCREEN_WIDTH * 0.05,
-    fontWeight: "700",
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: "800",
     marginBottom: 12,
   },
   metaRow: {
@@ -180,7 +191,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   metaPillText: {
-    fontSize: SCREEN_WIDTH * 0.033,
+    fontSize: 13,
     fontWeight: "600",
   },
   genreContainer: {
@@ -195,7 +206,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   genreText: {
-    fontSize: SCREEN_WIDTH * 0.03,
+    fontSize: 12,
     fontWeight: "600",
   },
 });
